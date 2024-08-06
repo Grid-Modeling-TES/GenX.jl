@@ -64,6 +64,14 @@ function write_reserve_margin_revenue(path::AbstractString,
                                      value.(EP[:vCAPRES_charge][STOR_ALL, :]).data) *
                                     weighted_price)
         end
+        if !isempty(TES)
+            tempresrev[TES] = derating_factor.(gen.Tes, tag = i) .*
+                                   ((value.(EP[:vP][TES, :]) -
+                                     value.(EP[:vCHARGE_TES][TES, :]).data +
+                                     value.(EP[:vCAPRES_discharge_TES][TES, :]).data -
+                                     value.(EP[:vCAPRES_charge_TES][TES, :]).data) *
+                                    weighted_price)
+        end
         if !isempty(FLEX)
             tempresrev[FLEX] = derating_factor.(gen.FlexDemand, tag = i) .*
                                ((value.(EP[:vCHARGE_FLEX][FLEX, :]).data -

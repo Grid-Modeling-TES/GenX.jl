@@ -34,10 +34,12 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 
     cVar = value(EP[:eTotalCVarOut]) +
            (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0.0) +
+           (!isempty(inputs["TES"]) ? value(EP[:eTotalCVarIn_TES]) : 0.0) +
            (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0.0)
     cFix = value(EP[:eTotalCFix]) +
            (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0.0) +
-           (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0.0)
+           (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0.0) +
+           (!isempty(inputs["TES"]) ? value(EP[:eTotalCFixCharge_TES]) : 0.0)
 
     cFuel = value.(EP[:eTotalCFuelOut])
 
@@ -156,6 +158,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
         Y_ZONE = resources_in_zone_by_rid(gen, z)
         STOR_ALL_ZONE = intersect(inputs["STOR_ALL"], Y_ZONE)
         STOR_ASYMMETRIC_ZONE = intersect(inputs["STOR_ASYMMETRIC"], Y_ZONE)
+        TES_ZONE = intersect(inputs["TES"], Y_ZONE)
         FLEX_ZONE = intersect(inputs["FLEX"], Y_ZONE)
         COMMIT_ZONE = intersect(inputs["COMMIT"], Y_ZONE)
         ELECTROLYZERS_ZONE = intersect(inputs["ELECTROLYZER"], Y_ZONE)
@@ -174,12 +177,23 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
         if !isempty(STOR_ALL_ZONE)
             eCVar_in = sum(value.(EP[:eCVar_in][STOR_ALL_ZONE, :]))
             tempCVar += eCVar_in
-            eCFixEnergy = sum(value.(EP[:eCFixEnergy][STOR_ALL_ZONE]))
+            if !isempty(TES_ZONE)
+                eCVar_in = sum(value.(EP[:eCVar_in][STOR_ALL_ZONE, :])) + sum(value.(EP[:eCVar_in_TES][TES_ZONE, :]))
+                eCFixEnergy = sum(value.(EP[:eCFixEnergy][STOR_ALL_ZONE])) + sum(value.(EP[:eCFixEnergy_TES][TES_ZONE]))
+            else
+                eCVar_in = sum(value.(EP[:eCVar_in][STOR_ALL_ZONE, :]))
+                eCFixEnergy = sum(value.(EP[:eCFixEnergy][STOR_ALL_ZONE]))
+            end
             tempCFix += eCFixEnergy
             tempCTotal += eCVar_in + eCFixEnergy
         end
         if !isempty(STOR_ASYMMETRIC_ZONE)
             eCFixCharge = sum(value.(EP[:eCFixCharge][STOR_ASYMMETRIC_ZONE]))
+            tempCFix += eCFixCharge
+            tempCTotal += eCFixCharge
+        end
+        if !isempty(TES_ZONE)
+            eCFixCharge = sum(value.(EP[:eCFixCharge_TES][TES_ZONE]))
             tempCFix += eCFixCharge
             tempCTotal += eCFixCharge
         end

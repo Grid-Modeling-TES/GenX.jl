@@ -27,6 +27,7 @@ function write_net_revenue(path::AbstractString,
     G = inputs["G"]     # Number of generators
     COMMIT = inputs["COMMIT"]# Thermal units for unit commitment
     STOR_ALL = inputs["STOR_ALL"]
+    TES = inputs["TES"]
 
     if setup["OperationalReserves"] >= 1
         RSV = inputs["RSV"]# Generators contributing to operating reserves
@@ -141,6 +142,11 @@ function write_net_revenue(path::AbstractString,
     if !isempty(STOR_ALL)
         dfNetRevenue.Var_OM_cost_in[STOR_ALL] = var_om_cost_per_mwh_in.(gen.Storage) .*
                                                 ((value.(EP[:vCHARGE][STOR_ALL, :]).data) *
+                                                 inputs["omega"])
+    end
+    if !isempty(TES)
+        dfNetRevenue.Var_OM_cost_in[TES] = var_om_cost_per_mwh_in.(gen.Tes) .*
+                                                ((value.(EP[:vCHARGE_TES][TES, :]).data) *
                                                  inputs["omega"])
     end
     if !isempty(VRE_STOR)

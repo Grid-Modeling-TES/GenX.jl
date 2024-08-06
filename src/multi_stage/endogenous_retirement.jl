@@ -334,12 +334,17 @@ function endogenous_retirement_energy!(EP::Model,
 
     NEW_CAP_ENERGY = inputs["NEW_CAP_ENERGY"] # Set of all storage resources eligible for new energy capacity
     RET_CAP_ENERGY = inputs["RET_CAP_ENERGY"] # Set of all storage resources eligible for energy capacity retirements
+    
+    NEW_CAP_ENERGY_TES = inputs["NEW_CAP_ENERGY_TES"] # Set of all storage resources eligible for new energy capacity
+    RET_CAP_ENERGY_TES = inputs["RET_CAP_ENERGY_TES"] # Set of all storage resources eligible for energy capacity retirements
 
     ### Variables ###
 
     # Keep track of all new and retired capacity from all stages
     @variable(EP, vCAPTRACKENERGY[y in RET_CAP_ENERGY, p = 1:num_stages]>=0)
     @variable(EP, vRETCAPTRACKENERGY[y in RET_CAP_ENERGY, p = 1:num_stages]>=0)
+    @variable(EP, vCAPTRACKENERGY_TES[y in RET_CAP_ENERGY_TES, p = 1:num_stages]>=0)
+    @variable(EP, vRETCAPTRACKENERGY_TES[y in RET_CAP_ENERGY_TES, p = 1:num_stages]>=0)
 
     ### Expressions ###
 
@@ -350,7 +355,15 @@ function endogenous_retirement_energy!(EP::Model,
             EP[:vZERO]
         end)
 
+    @expression(EP, eNewCapEnergy_TES[y in RET_CAP_ENERGY_TES],
+        if y in NEW_CAP_ENERGY_TES
+            EP[:vCAPENERGY_TES][y]
+        else
+            EP[:vZERO]
+        end)
+
     @expression(EP, eRetCapEnergy[y in RET_CAP_ENERGY], EP[:vRETCAPENERGY][y])
+    @expression(EP, eRetCapEnergy_TES[y in RET_CAP_ENERGY_TES], EP[:vRETCAPENERGY_TES][y])    
 
     # Construct and add the endogenous retirement constraint expressions
     @expression(EP,
@@ -364,6 +377,18 @@ function endogenous_retirement_energy!(EP::Model,
         eMinRetCapTrackEnergy[y in RET_CAP_ENERGY],
         cum_min_retired_energy_cap_mw(gen[y]))
 
+    # For TES
+    @expression(EP,
+        eRetCapTrackEnergy_TES[y in RET_CAP_ENERGY_TES],
+        sum(EP[:vRETCAPTRACKENERGY_TES][y, p] for p in 1:cur_stage))
+    @expression(EP,
+        eNewCapTrackEnergy_TES[y in RET_CAP_ENERGY_TES],
+        sum(EP[:vCAPTRACKENERGY_TES][y, p]
+        for p in 1:get_retirement_stage(cur_stage, lifetime(gen[y]), stage_lens)))
+    @expression(EP,
+        eMinRetCapTrackEnergy_TES[y in RET_CAP_ENERGY_TES],
+        cum_min_retired_energy_cap_mw(gen[y]))
+
     ### Constratints ###
 
     # Keep track of newly built capacity from previous stages
@@ -374,6 +399,15 @@ function endogenous_retirement_energy!(EP::Model,
     @constraint(EP,
         cCapTrackEnergy[y in RET_CAP_ENERGY, p = 1:(cur_stage - 1)],
         vCAPTRACKENERGY[y, p]==0)
+
+    # For TES
+    @constraint(EP,
+        cCapTrackEnergyNew_TES[y in RET_CAP_ENERGY_TES],
+        eNewCapEnergy_TES[y]==vCAPTRACKENERGY_TES[y, cur_stage])
+    # The RHS of this constraint will be updated in the forward pass
+    @constraint(EP,
+        cCapTrackEnergy_TES[y in RET_CAP_ENERGY_TES, p = 1:(cur_stage - 1)],
+        vCAPTRACKENERGY_TES[y, p]==0)
 
     # Keep track of retired capacity from previous stages
     @constraint(EP,
@@ -387,6 +421,19 @@ function endogenous_retirement_energy!(EP::Model,
     @constraint(EP,
         cLifetimeRetEnergy[y in RET_CAP_ENERGY],
         eNewCapTrackEnergy[y] + eMinRetCapTrackEnergy[y]<=eRetCapTrackEnergy[y])
+
+    # Keep track of retired capacity from previous stages
+    @constraint(EP,
+        cRetCapTrackEnergyNew_TES[y in RET_CAP_ENERGY_TES],
+        eRetCapEnergy_TES[y]==vRETCAPTRACKENERGY_TES[y, cur_stage])
+    # The RHS of this constraint will be updated in the forward pass
+    @constraint(EP,
+        cRetCapTrackEnergy_TES[y in RET_CAP_ENERGY_TES, p = 1:(cur_stage - 1)],
+        vRETCAPTRACKENERGY_TES[y, p]==0)
+
+    @constraint(EP,
+        cLifetimeRetEnergy_TES[y in RET_CAP_ENERGY_TES],
+        eNewCapTrackEnergy_TES[y] + eMinRetCapTrackEnergy_TES[y]<=eRetCapTrackEnergy_TES[y])
 end
 
 function endogenous_retirement_vre_stor_dc!(EP::Model,

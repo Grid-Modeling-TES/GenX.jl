@@ -92,6 +92,7 @@ function generate_model(setup::Dict, inputs::Dict, OPTIMIZER::MOI.OptimizerWithA
 
     # Energy losses related to technologies
     create_empty_expression!(EP, :eELOSSByZone, Z)
+    create_empty_expression!(EP, :eELOSSByZone_TES, Z)
 
     # Initialize Capacity Reserve Margin Expression
     if setup["CapacityReserveMargin"] > 0
@@ -156,6 +157,11 @@ function generate_model(setup::Dict, inputs::Dict, OPTIMIZER::MOI.OptimizerWithA
     # Model constraints, variables, expression related to energy storage modeling
     if !isempty(inputs["STOR_ALL"])
         storage!(EP, inputs, setup)
+    end
+
+    # Model constraints, variables, expression related to tes modeling
+    if !isempty(inputs["TES"])
+        tes!(EP, inputs, setup)
     end
 
     # Model constraints, variables, expression related to reservoir hydropower resources

@@ -92,6 +92,12 @@ function write_outputs(EP::Model, path::AbstractString, setup::Dict, inputs::Dic
         println(elapsed_time_storage)
     end
 
+    if output_settings_d["WriteTes"]
+        elapsed_time_tes = @elapsed write_tes(path, inputs, setup, EP)
+        println("Time elapsed for writing tes is")
+        println(elapsed_time_tes)
+    end
+
     if output_settings_d["WriteCurtailment"]
         elapsed_time_curtailment = @elapsed write_curtailment(path, inputs, setup, EP)
         println("Time elapsed for writing curtailment is")

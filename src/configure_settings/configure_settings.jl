@@ -131,6 +131,7 @@ function default_writeoutput()
         "WriteStart" => true,
         "WriteStatus" => true,
         "WriteStorage" => true,
+        "WriteTes" => true,
         "WriteStorageDual" => true,
         "WriteSubsidyRevenue" => true,
         "WriteTimeWeights" => true,
@@ -149,6 +150,7 @@ function configure_writeoutput(output_settings_path::String, settings::Dict)
         writeoutput["WritePrice"] = false
         writeoutput["WriteReliability"] = false
         writeoutput["WriteStorage"] = false
+        writeoutput["WriteTes"] = false
         writeoutput["WriteStorageDual"] = false
         writeoutput["WriteTimeWeights"] = false
         writeoutput["WriteCommit"] = false

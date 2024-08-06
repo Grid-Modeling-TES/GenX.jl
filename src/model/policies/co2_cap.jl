@@ -108,7 +108,7 @@ function co2_cap!(EP::Model, inputs::Dict, setup::Dict)
                 for t in 1:T)
             for z in findall(x -> x == 1, inputs["dfCO2CapZones"][:, cap])) +
             sum(inputs["dfMaxCO2Rate"][z, cap] * setup["StorageLosses"] *
-                EP[:eELOSSByZone][z]
+                (EP[:eELOSSByZone][z] + EP[:eELOSSByZone_TES][z])
             for z in findall(x -> x == 1, inputs["dfCO2CapZones"][:, cap])))
 
         ## Generation + Rate-based: Emissions constraint in terms of rate (tons/MWh)

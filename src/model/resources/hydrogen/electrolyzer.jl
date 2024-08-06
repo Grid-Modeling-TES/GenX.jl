@@ -87,6 +87,7 @@ function electrolyzer!(EP::Model, inputs::Dict, setup::Dict)
 
     ELECTROLYZERS = inputs["ELECTROLYZER"]
     STORAGE = inputs["STOR_ALL"]
+    TES = inputs["TES"]
 
     p = inputs["hours_per_subperiod"] #total number of hours per subperiod
 
@@ -161,9 +162,10 @@ function electrolyzer!(EP::Model, inputs::Dict, setup::Dict)
         QUALIFIED_SUPPLY = ids_with(gen, qualified_hydrogen_supply)
         @constraint(EP, cHourlyMatching[z in HYDROGEN_ZONES, t in 1:T],
             sum(EP[:vP][y, t]
-            for y in intersect(resources_in_zone_by_rid(gen, z), QUALIFIED_SUPPLY))>=sum(EP[:vUSE][y,t]
+            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY))>=sum(EP[:vUSE][y,t]
             for y in intersect(resources_in_zone_by_rid(gen,z), ELECTROLYZERS)) + sum(EP[:vCHARGE][y,t]
-            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)))
+            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)) + sum(EP[:vCHARGE_TES][y,t]
+            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, TES)))
     end
 
     ### Energy Share Requirement Policy ###

@@ -68,6 +68,12 @@ Modules = [GenX]
 Pages = ["write_storage.jl"]
 ```
 
+## Write TES State of Charge
+```@autodocs
+Modules = [GenX]
+Pages = ["write_tes.jl"]
+```
+
 ## Write Storage Dual
 ```@autodocs
 Modules = [GenX]

@@ -8,6 +8,7 @@ Possible values:
 - :Vre
 - :Hydro
 - :Storage
+- :Tes
 - :MustRun
 - :FlexDemand
 - :VreStorage
@@ -17,6 +18,7 @@ const resource_types = (:Thermal,
     :Vre,
     :Hydro,
     :Storage,
+    :Tes,
     :MustRun,
     :FlexDemand,
     :VreStorage,
@@ -657,8 +659,8 @@ end
 
 # Reservoir hydro and storage
 const default_percent = 1.0
-efficiency_up(r::T) where {T <: Union{Hydro, Storage}} = get(r, :eff_up, default_percent)
-function efficiency_down(r::T) where {T <: Union{Hydro, Storage}}
+efficiency_up(r::T) where {T <: Union{Hydro, Storage, Tes}} = get(r, :eff_up, default_percent)
+function efficiency_down(r::T) where {T <: Union{Hydro, Storage, Tes}}
     get(r, :eff_down, default_percent)
 end
 
@@ -670,8 +672,10 @@ ramp_down_fraction(r::VarPower) = get(r, :ramp_dn_percentage, default_percent)
 
 # Retirement - Multistage
 lifetime(r::Storage) = get(r, :lifetime, 15)
+lifetime(r::Tes) = get(r, :lifetime, 20)
 lifetime(r::AbstractResource) = get(r, :lifetime, 30)
 capital_recovery_period(r::Storage) = get(r, :capital_recovery_period, 15)
+capital_recovery_period(r::Tes) = get(r, :capital_recovery_period, 20)
 capital_recovery_period(r::AbstractResource) = get(r, :capital_recovery_period, 30)
 tech_wacc(r::AbstractResource) = get(r, :wacc, default_zero)
 min_retired_cap_mw(r::AbstractResource) = get(r, :min_retired_cap_mw, default_zero)
@@ -788,6 +792,24 @@ end
 function asymmetric_storage(rs::Vector{T}) where {T <: AbstractResource}
     findall(r -> isa(r, Storage) && r.model == 2, rs)
 end
+
+# TES interface
+
+"""
+    tes(rs::Vector{T}) where T <: AbstractResource
+
+Returns the indices of all tes resources in the vector `rs`.
+"""
+tes(rs::Vector{T}) where {T <: AbstractResource} = findall(r -> isa(r, Tes), rs)
+
+self_discharge(r::Tes) = r.self_disch
+min_duration(r::Tes) = r.min_duration
+max_duration(r::Tes) = r.max_duration
+var_om_cost_per_mwh_in(r::Tes) = get(r, :var_om_cost_per_mwh_in, default_zero)
+function asymmetric_tes(rs::Vector{T}) where {T <: AbstractResource}
+    findall(r -> isa(r, Tes) && r.model == 2, rs)
+end
+
 
 # HYDRO interface
 """

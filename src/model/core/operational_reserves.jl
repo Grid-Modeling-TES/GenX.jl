@@ -221,6 +221,8 @@ function operational_reserves_core!(EP::Model, inputs::Dict, setup::Dict)
     REG = inputs["REG"]
     RSV = inputs["RSV"]
     STOR_ALL = inputs["STOR_ALL"]
+    TES = inputs["TES"]
+    STOR_ALL_AND_TES = union(STOR_ALL, TES)
 
     pDemand = inputs["pD"]
     pP_Max(y, t) = inputs["pP_Max"][y, t]
@@ -243,10 +245,10 @@ function operational_reserves_core!(EP::Model, inputs::Dict, setup::Dict)
 
     # Storage techs have two pairs of auxilary variables to reflect contributions to regulation and reserves
     # when charging and discharging (primary variable becomes equal to sum of these auxilary variables)
-    @variable(EP, vREG_discharge[y in intersect(STOR_ALL, REG), t = 1:T]>=0) # Contribution to regulation (primary reserves) (mirrored variable used for storage devices)
-    @variable(EP, vRSV_discharge[y in intersect(STOR_ALL, RSV), t = 1:T]>=0) # Contribution to operating reserves (secondary reserves) (mirrored variable used for storage devices)
-    @variable(EP, vREG_charge[y in intersect(STOR_ALL, REG), t = 1:T]>=0) # Contribution to regulation (primary reserves) (mirrored variable used for storage devices)
-    @variable(EP, vRSV_charge[y in intersect(STOR_ALL, RSV), t = 1:T]>=0) # Contribution to operating reserves (secondary reserves) (mirrored variable used for storage devices)
+    @variable(EP, vREG_discharge[y in intersect(STOR_ALL_AND_TES, REG), t = 1:T]>=0) # Contribution to regulation (primary reserves) (mirrored variable used for storage devices)
+    @variable(EP, vRSV_discharge[y in intersect(STOR_ALL_AND_TES, RSV), t = 1:T]>=0) # Contribution to operating reserves (secondary reserves) (mirrored variable used for storage devices)
+    @variable(EP, vREG_charge[y in intersect(STOR_ALL_AND_TES, REG), t = 1:T]>=0) # Contribution to regulation (primary reserves) (mirrored variable used for storage devices)
+    @variable(EP, vRSV_charge[y in intersect(STOR_ALL_AND_TES, RSV), t = 1:T]>=0) # Contribution to operating reserves (secondary reserves) (mirrored variable used for storage devices)
 
     @variable(EP, vUNMET_RSV[t = 1:T]>=0) # Unmet operating reserves penalty/cost
 

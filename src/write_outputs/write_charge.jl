@@ -10,6 +10,7 @@ function write_charge(path::AbstractString, inputs::Dict, setup::Dict, EP::Model
     G = inputs["G"]     # Number of resources (generators, storage, DR, and DERs)
     T = inputs["T"]     # Number of time steps (hours)
     STOR_ALL = inputs["STOR_ALL"]
+    TES = inputs["TES"]
     FLEX = inputs["FLEX"]
     ELECTROLYZER = inputs["ELECTROLYZER"]
     VRE_STOR = inputs["VRE_STOR"]
@@ -24,6 +25,9 @@ function write_charge(path::AbstractString, inputs::Dict, setup::Dict, EP::Model
     scale_factor = setup["ParameterScale"] == 1 ? ModelScalingFactor : 1
     if !isempty(STOR_ALL)
         charge[STOR_ALL, :] = value.(EP[:vCHARGE][STOR_ALL, :]) * scale_factor
+    end
+    if !isempty(TES)
+        charge[TES, :] = value.(EP[:vCHARGE_TES][TES, :]) * scale_factor
     end
     if !isempty(FLEX)
         charge[FLEX, :] = value.(EP[:vCHARGE_FLEX][FLEX, :]) * scale_factor

@@ -54,6 +54,16 @@ function write_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP::Mod
         existingcapcharge[i] = MultiStage == 1 ? value(EP[:vEXISTINGCAPCHARGE][i]) :
                                existing_charge_cap_mw(gen[i])
     end
+    for i in inputs["TES"]
+        if i in inputs["NEW_CAP_CHARGE_TES"]
+            capcharge[i] = value(EP[:vCAPCHARGE_TES][i])
+        end
+        if i in inputs["RET_CAP_CHARGE_TES"]
+            retcapcharge[i] = value(EP[:vRETCAPCHARGE_TES][i])
+        end
+        existingcapcharge[i] = MultiStage == 1 ? value(EP[:vEXISTINGCAPCHARGE_TES][i]) :
+                               existing_charge_cap_mw(gen[i])
+    end
 
     capenergy = zeros(size(inputs["RESOURCE_NAMES"]))
     retcapenergy = zeros(size(inputs["RESOURCE_NAMES"]))
@@ -66,6 +76,16 @@ function write_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP::Mod
             retcapenergy[i] = value(EP[:vRETCAPENERGY][i])
         end
         existingcapenergy[i] = MultiStage == 1 ? value(EP[:vEXISTINGCAPENERGY][i]) :
+                               existing_cap_mwh(gen[i])
+    end
+    for i in inputs["TES"]
+        if i in inputs["NEW_CAP_ENERGY_TES"]
+            capenergy[i] = value(EP[:vCAPENERGY_TES][i])
+        end
+        if i in inputs["RET_CAP_ENERGY_TES"]
+            retcapenergy[i] = value(EP[:vRETCAPENERGY_TES][i])
+        end
+        existingcapenergy[i] = MultiStage == 1 ? value(EP[:vEXISTINGCAPENERGY_TES][i]) :
                                existing_cap_mwh(gen[i])
     end
     if !isempty(inputs["VRE_STOR"])

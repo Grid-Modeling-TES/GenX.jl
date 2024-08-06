@@ -8,6 +8,7 @@ function write_power_balance(path::AbstractString, inputs::Dict, setup::Dict, EP
     MUST_RUN = inputs["MUST_RUN"]
     HYDRO_RES = inputs["HYDRO_RES"]
     STOR_ALL = inputs["STOR_ALL"]
+    TES = inputs["TES"]
     FLEX = inputs["FLEX"]
     ELECTROLYZER = inputs["ELECTROLYZER"]
     VRE_STOR = inputs["VRE_STOR"]
@@ -22,6 +23,10 @@ function write_power_balance(path::AbstractString, inputs::Dict, setup::Dict, EP
     if !isempty(VRE_STOR)
         push!(Com_list, "VRE_Storage_Discharge")
         push!(Com_list, "VRE_Storage_Charge")
+    end
+    if !isempty(TES)
+        push!(Com_list, "TES_Discharge")
+        push!(Com_list, "TES_Charge")
     end
     L = length(Com_list)
     dfPowerBalance = DataFrame(BalanceComponent = repeat(Com_list, outer = Z),
@@ -77,6 +82,14 @@ function write_power_balance(path::AbstractString, inputs::Dict, setup::Dict, EP
                 value.(EP[:vP][VS_ALL_ZONE, :]), dims = 1)
             powerbalance[(z - 1) * L + charge_idx, :] = (-1) * sum(
                 value.(EP[:vCHARGE_VRE_STOR][VS_ALL_ZONE, :]).data, dims = 1)
+        end
+        if !isempty(intersect(resources_in_zone_by_rid(gen, z), TES))
+            TES_ZONE = intersect(resources_in_zone_by_rid(gen, z), TES)
+            powerbalance[(z - 1) * L + 12, :] = sum(value.(EP[:vP][TES, :]),
+                dims = 1)
+            powerbalance[(z - 1) * L + 13, :] = (-1) * sum(
+                (value.(EP[:vCHARGE_TES][TES_ZONE,:]).data),
+                dims = 1)
         end
     end
     if setup["ParameterScale"] == 1

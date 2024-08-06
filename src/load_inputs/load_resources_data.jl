@@ -12,6 +12,7 @@ function _get_resource_info()
         thermal = (filename = "Thermal.csv", type = Thermal),
         vre = (filename = "Vre.csv", type = Vre),
         storage = (filename = "Storage.csv", type = Storage),
+        tes = (filename = "Tes.csv", type = Tes),
         flex_demand = (filename = "Flex_demand.csv", type = FlexDemand),
         must_run = (filename = "Must_run.csv", type = MustRun),
         electrolyzer = (filename = "Electrolyzer.csv", type = Electrolyzer),
@@ -54,6 +55,7 @@ function _get_summary_map()
         :FlexDemand => "Flexible_demand",
         :Hydro => "Hydro",
         :Storage => "Storage",
+        :Tes => "TES",
         :Thermal => "Thermal",
         :Vre => "VRE",
         :MustRun => "Must_run",
@@ -359,7 +361,7 @@ function check_mustrun_reserve_contribution(r::AbstractResource)
 end
 
 function check_LDS_applicability(r::AbstractResource)
-    applicable_resources = Union{Storage, Hydro}
+    applicable_resources = Union{Storage, Hydro, Tes}
     error_strings = String[]
 
     not_set = default_zero
@@ -993,11 +995,16 @@ function add_resources_to_input_data!(inputs::Dict,
     # Set of all storage resources
     inputs["STOR_ALL"] = union(inputs["STOR_SYMMETRIC"], inputs["STOR_ASYMMETRIC"])
 
+    # TES resources
+    inputs["TES"] = asymmetric_tes(gen)
+
     # Set of storage resources with long duration storage capabilitites
     inputs["STOR_HYDRO_LONG_DURATION"] = intersect(inputs["HYDRO_RES"], is_LDS(gen))
     inputs["STOR_HYDRO_SHORT_DURATION"] = intersect(inputs["HYDRO_RES"], is_SDS(gen))
     inputs["STOR_LONG_DURATION"] = intersect(inputs["STOR_ALL"], is_LDS(gen))
     inputs["STOR_SHORT_DURATION"] = intersect(inputs["STOR_ALL"], is_SDS(gen))
+    inputs["STOR_LONG_DURATION_TES"] = intersect(inputs["TES"], is_LDS(gen))
+    inputs["STOR_SHORT_DURATION_TES"] = intersect(inputs["TES"], is_SDS(gen))
 
     ## VRE
     # Set of controllable variable renewable resources
@@ -1113,6 +1120,26 @@ function add_resources_to_input_data!(inputs::Dict,
     end
     inputs["NEW_CAP_ENERGY"] = new_cap_energy
     inputs["RET_CAP_ENERGY"] = ret_cap_energy
+    println(inputs["NEW_CAP_ENERGY"])
+
+    new_cap_energy_tes = Set{Int64}()
+    ret_cap_energy_tes = Set{Int64}()
+    if !isempty(inputs["TES"])
+        # Set of all storage resources eligible for new energy capacity
+        new_cap_energy_tes = intersect(buildable,
+            ids_with(gen, max_cap_mwh),
+            inputs["TES"])
+        # Set of all storage resources eligible for energy capacity retirements
+        ret_cap_energy_tes = intersect(retirable,
+            ids_with_nonneg(gen, existing_cap_mwh),
+            inputs["TES"])
+    end
+    inputs["NEW_CAP_ENERGY_TES"] = new_cap_energy_tes
+    inputs["RET_CAP_ENERGY_TES"] = ret_cap_energy_tes
+    println(inputs["NEW_CAP_ENERGY_TES"])
+    
+
+
 
     new_cap_charge = Set{Int64}()
     ret_cap_charge = Set{Int64}()
@@ -1128,6 +1155,23 @@ function add_resources_to_input_data!(inputs::Dict,
     end
     inputs["NEW_CAP_CHARGE"] = new_cap_charge
     inputs["RET_CAP_CHARGE"] = ret_cap_charge
+    println(inputs["NEW_CAP_CHARGE"])
+
+    new_cap_charge_tes = Set{Int64}()
+    ret_cap_charge_tes = Set{Int64}()
+    if !isempty(inputs["TES"])
+        # Set of asymmetric charge/discharge storage resources eligible for new charge capacity
+        new_cap_charge_tes = intersect(buildable,
+            ids_with(gen, max_charge_cap_mw),
+            inputs["TES"])
+        # Set of asymmetric charge/discharge storage resources eligible for charge capacity retirements
+        ret_cap_charge_tes = intersect(retirable,
+            ids_with_nonneg(gen, existing_charge_cap_mw),
+            inputs["TES"])
+    end
+    inputs["NEW_CAP_CHARGE_TES"] = new_cap_charge_tes
+    inputs["RET_CAP_CHARGE_TES"] = ret_cap_charge_tes
+    println(inputs["NEW_CAP_CHARGE_TES"])
 
     ## Co-located resources
     # VRE and storage
@@ -1237,6 +1281,7 @@ function add_resources_to_input_data!(inputs::Dict,
 
     # Names of resources
     inputs["RESOURCE_NAMES"] = resource_name(gen)
+    println(inputs["RESOURCE_NAMES"])
 
     # Zones resources are located in
     zones = zone_id(gen)
@@ -1253,6 +1298,7 @@ function add_resources_to_input_data!(inputs::Dict,
     end
 
     inputs["RESOURCES"] = gen
+    println(inputs["RESOURCES"])
     return nothing
 end
 
