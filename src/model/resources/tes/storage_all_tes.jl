@@ -15,6 +15,7 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
 
     T = inputs["T"]     # Number of time steps (hours)
     Z = inputs["Z"]     # Number of zones
+    p = inputs["hours_per_subperiod"]
 
     TES = inputs["TES"]
     STOR_SHORT_DURATION = inputs["STOR_SHORT_DURATION_TES"]
@@ -33,26 +34,10 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
     # Energy withdrawn from grid by resource "y" at hour "t" [MWh] on zone "z"
     @variable(EP, vCHARGE_TES[y in TES, t = 1:T]>=0)
 
-    if CapacityReserveMargin > 0
-        # Virtual discharge contributing to capacity reserves at timestep t for storage cluster y
-        @variable(EP, vCAPRES_discharge_TES[y in TES, t = 1:T]>=0)
-
-        # Virtual charge contributing to capacity reserves at timestep t for storage cluster y
-        @variable(EP, vCAPRES_charge_TES[y in TES, t = 1:T]>=0)
-
-        # Total state of charge being held in reserve at timestep t for storage cluster y
-        @variable(EP, vCAPRES_socinreserve_TES[y in TES, t = 1:T]>=0)
-    end
+    # TES "discharge" in MWh
+    @variable(EP, vUSE_TES[y = TES, t in 1:T]>=0)
 
     ### Expressions ###
-
-    # Energy losses related to technologies (increase in effective demand)
-    @expression(EP,
-        eELOSS_TES[y in TES],
-        sum(inputs["omega"][t] * EP[:vCHARGE_TES][y, t]
-        for t in 1:T)-sum(inputs["omega"][t] *
-                          EP[:vP][y, t]
-        for t in 1:T))
 
     ## Objective Function Expressions ##
 
@@ -64,41 +49,69 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
     # Sum individual resource contributions to variable charging costs to get total variable charging costs
     @expression(EP, eTotalCVarInT_TES[t = 1:T], sum(eCVar_in_TES[y, t] for y in TES))
     @expression(EP, eTotalCVarIn_TES, sum(eTotalCVarInT_TES[t] for t in 1:T))
-    add_to_expression!(EP[:eObj], eTotalCVarIn_TES)
+    EP[:eObj] += eTotalCVarIn_TES
 
-    if CapacityReserveMargin > 0
-        #Variable costs of "virtual charging" for technologies "y" during hour "t" in zone "z"
-        @expression(EP,
-            eCVar_in_virtual_TES[y in TES, t = 1:T],
-            inputs["omega"][t]*virtual_discharge_cost*vCAPRES_charge_TES[y, t])
-        @expression(EP,
-            eTotalCVarInT_virtual_TES[t = 1:T],
-            sum(eCVar_in_virtual_TES[y, t] for y in TES))
-        @expression(EP, eTotalCVarIn_virtual_TES, sum(eTotalCVarInT_virtual_TES[t] for t in 1:T))
-        EP[:eObj] += eTotalCVarIn_virtual_TES
 
-        #Variable costs of "virtual discharging" for technologies "y" during hour "t" in zone "z"
-        @expression(EP,
-            eCVar_out_virtual_TES[y in TES, t = 1:T],
-            inputs["omega"][t]*virtual_discharge_cost*vCAPRES_discharge_TES[y, t])
-        @expression(EP,
-            eTotalCVarOutT_virtual_TES[t = 1:T],
-            sum(eCVar_out_virtual_TES[y, t] for y in TES))
-        @expression(EP, eTotalCVarOut_virtual_TES, sum(eTotalCVarOutT_virtual_TES[t] for t in 1:T))
-        EP[:eObj] += eTotalCVarOut_virtual_TES
-    end
+    # Subtract TES revenue from objective function
+    scale_factor = setup["ParameterScale"] == 1 ? 10^6 : 1  # If ParameterScale==1, costs are in millions of $
+    @expression(EP,
+        eHydrogenValue_TES[y in TES, t in 1:T],
+        (inputs["omega"][t] * EP[:vUSE_TES][y, t] / tes_mwh_per_mmbtu(gen[y]) *
+        heat_price_per_mmbtu(gen[y])/scale_factor))
+    @expression(EP,
+        eTotalHydrogenValueT_TES[t in 1:T],
+        sum(eHydrogenValue_TES[y, t] for y in TES))
+    @expression(EP, eTotalHydrogenValue_TES, sum(eTotalHydrogenValueT_TES[t] for t in 1:T))
+    EP[:eObj] -= eTotalHydrogenValue_TES
+    
 
     ## Power Balance Expressions ##
+    @expression(EP, ePowerBalanceTES[t in 1:T, z in 1:Z],
+        sum(EP[:vCHARGE_TES][y, t] for y in intersect(TES, resources_in_zone_by_rid(gen, z))))
 
-    # Term to represent net dispatch from storage in any period
-    @expression(EP, ePowerBalanceStor_TES[t = 1:T, z = 1:Z],
-        sum(EP[:vP][y, t] - EP[:vCHARGE_TES][y, t]
-        for y in intersect(resources_in_zone_by_rid(gen, z), TES)))
-    add_similar_to_expression!(EP[:ePowerBalance], ePowerBalanceStor_TES)
+    # TES consumes electricity so their vCHARGE is subtracted from power balance.
+    EP[:ePowerBalance] -= ePowerBalanceTES
+
+    
+    ### Energy Share Requirement Policy ###
+    # Since we're using vUSE to denote TES consumption, we subtract this from the eESR Energy Share Requirement balance to increase demand for clean resources if desired
+    # TES demand is only accounted for in an ESR that the TES resources is tagged in in Generates_data.csv (e.g. ESR_N > 0) and
+    # a share of TES demand equal to df[y,:ESR_N] must be met by resources qualifying for ESR_N for each TES resource y.
+    # Using vCHARGE_TES instead of vUSE
+    if setup["EnergyShareRequirement"] >= 1
+        @expression(EP,
+            eElectrolyzerESR_TES[ESR in 1:inputs["nESR"]],
+            sum(inputs["omega"][t] * EP[:vCHARGE_TES][y, t]
+            for y in intersect(TES, ids_with_policy(gen, esr, tag = ESR)),
+            t in 1:T))
+        EP[:eESR] -= eElectrolyzerESR_TES
+    end
+
 
     ### Constraints ###
+    
+    # TES always discharges when there's a non-zero charge. This constraint sets the minimum heat production to the current charge divived by the maximum duration
+    @constraints(EP, begin
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] >= (EP[:vS_TES][y ,t]/max_duration(gen[y]))
+    end)
+
+    # Capacity factor constraint
+    @constraints(EP, begin
+        [y in TES],
+        sum(inputs["omega"][t] * EP[:vUSE_TES][y, t] for t in 1:T) >= sum(inputs["omega"][t]*min_power(gen[y])*EP[:eTotalCap][y] for t in 1:T)
+    end)
+
+    ### Remove vP (TES does not produce power so vP = 0 for all periods)
+    @constraints(EP, begin
+        [y in TES, t in 1:T], EP[:vP][y, t] == 0
+    end)
+
 
     ## Storage energy capacity and state of charge related constraints:
+    @constraint(EP, cCapRatio[y in TES],
+        EP[:eTotalCapEnergy_TES][y] == (max_duration(gen[y])*EP[:eTotalCap][y]))
+
 
     # Links state of charge in first time step with decisions in last time step of each subperiod
     # We use a modified formulation of this constraint (cSoCBalLongDurationStorageStart_TES) when operations wrapping and long duration storage are being modeled
@@ -112,9 +125,9 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
         EP[:vS_TES][y,
             t]==
         EP[:vS_TES][y, t + hours_per_subperiod - 1] -
-        (1 / efficiency_down(gen[y]) * EP[:vP][y, t])
+        (1 / efficiency_down(gen[y]) * EP[:vUSE_TES][y, t])
         +
-        (efficiency_up(gen[y]) * EP[:vCHARGE_TES][y, t]) -
+        (EP[:vCHARGE_TES][y, t]) -
         (self_discharge(gen[y]) * EP[:vS_TES][y, t + hours_per_subperiod - 1]))
 
     @constraints(EP,
@@ -126,149 +139,99 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
             # energy stored for the next hour
             cSoCBalInterior_TES[t in INTERIOR_SUBPERIODS, y in TES],
             EP[:vS_TES][y, t] ==
-            EP[:vS_TES][y, t - 1] - (1 / efficiency_down(gen[y]) * EP[:vP][y, t]) +
+            EP[:vS_TES][y, t - 1] - (1 / efficiency_down(gen[y]) * EP[:vUSE_TES][y, t]) +
             (efficiency_up(gen[y]) * EP[:vCHARGE_TES][y, t]) -
             (self_discharge(gen[y]) * EP[:vS_TES][y, t - 1])
         end)
 
     # Storage discharge and charge power (and reserve contribution) related constraints:
-    if OperationalReserves == 1
-        storage_all_operational_reserves_tes!(EP, inputs, setup)
-    else
-        if CapacityReserveMargin > 0
-            # Note: maximum charge rate is also constrained by maximum charge power capacity, but as this differs by storage type,
-            # this constraint is set in functions below for each storage type
+    @constraints(EP,
+        begin
+            [y in TES, t = 1:T], 
+            EP[:vUSE_TES][y, t] <= EP[:eTotalCap][y]
+            [y in TES, t = 1:T],
+            EP[:vUSE_TES][y, t] <=
+            EP[:vS_TES][y, hoursbefore(hours_per_subperiod, t, 1)] *
+            efficiency_down(gen[y])
+        end)
 
-            # Maximum discharging rate must be less than power rating OR available stored energy in the prior period, whichever is less
-            # wrapping from end of sample period to start of sample period for energy capacity constraint
-            @constraints(EP,
-                begin
-                    [y in TES, t = 1:T],
-                    EP[:vP][y, t] + EP[:vCAPRES_discharge_TES][y, t] <= EP[:eTotalCap][y]
-                    [y in TES, t = 1:T],
-                    EP[:vP][y, t] + EP[:vCAPRES_discharge_TES][y, t] <=
-                    EP[:vS_TES][y, hoursbefore(hours_per_subperiod, t, 1)] *
-                    efficiency_down(gen[y])
-                end)
-        else
-            @constraints(EP,
-                begin
-                    [y in TES, t = 1:T], EP[:vP][y, t] <= EP[:eTotalCap][y]
-                    [y in TES, t = 1:T],
-                    EP[:vP][y, t] <=
-                    EP[:vS_TES][y, hoursbefore(hours_per_subperiod, t, 1)] *
-                    efficiency_down(gen[y])
-                end)
-        end
-    end
+    
+    ### Maximum ramp up and down between consecutive hours - Not applicable as ramp rates are 100% between hours for TES
 
-    # From CO2 Policy module
-    expr = @expression(EP,
-        [z = 1:Z],
-        sum(EP[:eELOSS_TES][y] for y in intersect(TES, resources_in_zone_by_rid(gen, z))))
-    add_similar_to_expression!(EP[:eELOSSByZone_TES], expr)
-
-    # Capacity Reserve Margin policy
-    if CapacityReserveMargin > 0
-        # Constraints governing energy held in reserve when storage makes virtual capacity reserve margin contributions:
-
-        # Links energy held in reserve in first time step with decisions in last time step of each subperiod
-        # We use a modified formulation of this constraint (cVSoCBalLongDurationStorageStart_TES) when operations wrapping and long duration storage are being modeled
-        @constraint(EP,
-            cVSoCBalStart_TES[t in START_SUBPERIODS, y in CONSTRAINTSET],
-            EP[:vCAPRES_socinreserve_TES][y,
-                t]==
-            EP[:vCAPRES_socinreserve_TES][y, t + hours_per_subperiod - 1] +
-            (1 / efficiency_down(gen[y]) * EP[:vCAPRES_discharge_TES][y, t])
-            -
-            (efficiency_up(gen[y]) * EP[:vCAPRES_charge_TES][y, t]) - (self_discharge(gen[y]) *
-             EP[:vCAPRES_socinreserve_TES][y, t + hours_per_subperiod - 1]))
-
-        # energy held in reserve for the next hour
-        @constraint(EP,
-            cVSoCBalInterior_TES[t in INTERIOR_SUBPERIODS, y in TES],
-            EP[:vCAPRES_socinreserve_TES][y,
-                t]==
-            EP[:vCAPRES_socinreserve_TES][y, t - 1] +
-            (1 / efficiency_down(gen[y]) * EP[:vCAPRES_discharge_TES][y, t]) -
-            (efficiency_up(gen[y]) * EP[:vCAPRES_charge_TES][y, t]) -
-            (self_discharge(gen[y]) * EP[:vCAPRES_socinreserve_TES][y, t - 1]))
-
-        # energy held in reserve acts as a lower bound on the total energy held in storage
-        @constraint(EP,
-            cSOCMinCapRes_TES[t in 1:T, y in TES],
-            EP[:vS_TES][y, t]>=EP[:vCAPRES_socinreserve_TES][y, t])
-    end
-end
-
-function storage_all_operational_reserves_tes!(EP::Model, inputs::Dict, setup::Dict)
-    gen = inputs["RESOURCES"]
-    T = inputs["T"]
-    p = inputs["hours_per_subperiod"]
-    CapacityReserveMargin = setup["CapacityReserveMargin"] > 1
-
-    TES = inputs["TES"]
-
-    STOR_REG = intersect(TES, inputs["REG"]) # Set of storage resources with REG reserves
-    STOR_RSV = intersect(TES, inputs["RSV"]) # Set of storage resources with RSV reserves
-
-    vP = EP[:vP]
-    vS_TES = EP[:vS_TES]
-    vCHARGE_TES = EP[:vCHARGE_TES]
-    vREG = EP[:vREG]
-    vRSV = EP[:vRSV]
-    vREG_charge = EP[:vREG_charge]
-    vRSV_charge = EP[:vRSV_charge]
-    vREG_discharge = EP[:vREG_discharge]
-    vRSV_discharge = EP[:vRSV_discharge]
-
-    eTotalCap = EP[:eTotalCap]
-    eTotalCapEnergy_TES = EP[:eTotalCapEnergy_TES]
-
-    # Maximum storage contribution to reserves is a specified fraction of installed capacity
-    #@constraint(EP, [y in STOR_REG, t in 1:T], vREG[y, t]<=reg_max(gen[y]) * eTotalCap[y])
-    #@constraint(EP, [y in STOR_RSV, t in 1:T], vRSV[y, t]<=rsv_max(gen[y]) * eTotalCap[y])
-
-    # Actual contribution to regulation and reserves is sum of auxilary variables for portions contributed during charging and discharging
+    ### Minimum heat production constraint (if any)
+    #kmmbtu_to_mmbtu = 10^3
     #@constraint(EP,
-    #    [y in STOR_REG, t in 1:T],
-    #    vREG[y, t]==vREG_charge[y, t] + vREG_discharge[y, t])
-    #@constraint(EP,
-    #    [y in STOR_RSV, t in 1:T],
-    #    vRSV[y, t]==vRSV_charge[y, t] + vRSV_discharge[y, t])
+    #    cHydrogenMin_TES[y in TES],
+    #    sum(inputs["omega"][t] * EP[:eTesProduction][y, t] / tes_mwh_per_mmbtu(gen[y])
+    #    for t in 1:T)>=tes_min_kmmbtu(gen[y]) * kmmbtu_to_mmbtu)
 
-    # Maximum charging rate plus contribution to reserves up must be greater than zero
-    # Note: when charging, reducing charge rate is contributing to upwards reserve & regulation as it drops net demand
-    expr = extract_time_series_to_expression(vCHARGE_TES, TES)
-    add_similar_to_expression!(expr[STOR_REG, :], -vREG_charge[STOR_REG, :])
-    add_similar_to_expression!(expr[STOR_RSV, :], -vRSV_charge[STOR_RSV, :])
-    @constraint(EP, [y in TES, t in 1:T], expr[y, t]>=0)
 
-    # Maximum discharging rate and contribution to reserves down must be greater than zero
-    # Note: when discharging, reducing discharge rate is contributing to downwards regulation as it drops net supply
-    #@constraint(EP, [y in STOR_REG, t in 1:T], vP[y, t] - vREG_discharge[y, t]>=0)
+    ### Hydrogen Hourly Supply Matching Constraint (Constraint #6) ###
+    # Requires generation from qualified resources (indicated by Qualified_Hydrogen_Supply==1 in the resource .csv files)
+    # from within the same zone as the electrolyzers are located to be >= hourly consumption from electrolyzers in the zone
+    # (and any charging by qualified storage within the zone used to help increase electrolyzer utilization).
+    #if setup["HydrogenHourlyMatching"] == 1
+    #    HYDROGEN_ZONES = unique(zone_id.(gen.Electrolyzer))
+    #    QUALIFIED_SUPPLY = ids_with(gen, qualified_hydrogen_supply)
+    #    @constraint(EP, cHourlyMatching[z in HYDROGEN_ZONES, t in 1:T],
+    #        sum(EP[:vP][y, t]
+    #        for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY))>=sum(EP[:vUSE][y,t]
+    #        for y in intersect(resources_in_zone_by_rid(gen,z), ELECTROLYZERS)) + sum(EP[:vCHARGE][y,t]
+    #        for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)) + sum(EP[:vCHARGE_TES][y,t]
+    #        for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, TES)))
+    #end
 
-    # Maximum charging rate plus contribution to regulation down must be less than available storage capacity
-    STOR_REG_TES_ONLY = intersect(STOR_REG, TES)
-    @constraint(EP,
-        [y in STOR_REG_TES_ONLY, t in 1:T],
-        efficiency_up(gen[y]) *
-        (vCHARGE_TES[y, t] +
-         vREG_charge[y, t])<=eTotalCapEnergy_TES[y] - vS_TES[y, hoursbefore(p, t, 1)])
-    # Note: maximum charge rate is also constrained by maximum charge power capacity, but as this differs by storage type,
-    # this constraint is set in functions below for each storage type
 
-    expr = extract_time_series_to_expression(vP, TES)
-    add_similar_to_expression!(expr[STOR_REG, :], vREG_discharge[STOR_REG, :])
-    add_similar_to_expression!(expr[STOR_RSV, :], vRSV_discharge[STOR_RSV, :])
-    if CapacityReserveMargin
-        vCAPRES_discharge_TES = EP[:vCAPRES_discharge_TES]
-        add_similar_to_expression!(expr[TES, :], vCAPRES_discharge_TES[TES, :])
-    end
-    # Maximum discharging rate and contribution to reserves up must be less than power rating
-    @constraint(EP, [y in TES, t in 1:T], expr[y, t]<=eTotalCap[y])
-    # Maximum discharging rate and contribution to reserves up must be less than available stored energy in prior period
-    @constraint(EP,
+    # Attemps at constraining production in each hour are below - these tend to make the model non-linear.
+    #=     @variable(EP, vUSE_TES[y in TES, t in 1:T]>=0)
+    @variable(EP, vd1[y in TES, t in 1:T]>=0)
+    @variable(EP, vd2[y in TES, t in 1:T]>=0)
+    MMM = 15000
+
+    @constraints(EP, begin
         [y in TES, t in 1:T],
-        expr[y, t]<=vS_TES[y, hoursbefore(p, t, 1)] * efficiency_down(gen[y]))
+        EP[:vUSE_TES][y, t] <= EP[:vS_TES][y, t]
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y])
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] >= (EP[:vS_TES][y, t] - (MMM*(1-vd1[y, t])))
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] >= ((min_power(gen[y]) * EP[:eTotalCap][y]) - (MMM*(1-vd2[y, t])))
+        [y in TES, t in 1:T],
+        (vd1[y, t] + vd2[y, t]) == 1
+    end) =#
+
+#=     @variable(EP, vBinary[y in TES, t in 1:T] in Semiinteger(0, 1))
+    MMM = 15000
+    @constraints(EP, begin
+        [y in TES, t in 1:T],
+        ((min_power(gen[y]) * EP[:eTotalCap][y]) -  EP[:vS_TES][y, t]) <= (MMM*vBinary[y, t])
+
+        [y in TES, t in 1:T],
+        (EP[:vS_TES][y, t] - (min_power(gen[y]) * EP[:eTotalCap][y])) <= (MMM*(1-vBinary[y, t]))
+    end)
+
+    @constraints(EP, begin
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] <= EP[:vS_TES][y, t]
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y])
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] >= (EP[:vS_TES][y, t] - (MMM*(1-vBinary[y, t])))
+        [y in TES, t in 1:T],
+        EP[:vUSE_TES][y, t] >= ((min_power(gen[y]) * EP[:eTotalCap][y]) - (MMM*vBinary[y, t]))
+    end) =#
+
+    #@expression(EP, eTesProduction[y in TES, t in 1:T],
+    #    if EP[:vS_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y])
+    #        EP[:vS_TES][y, t]
+    #    else
+    #        min_power(gen[y]) * EP[:eTotalCap][y]
+    #    end)
+    #min(EP[:vS_TES][y, t],(min_power(gen[y]) * EP[:eTotalCap][y])))
+    #@expression(EP, eTesProduction[y in TES, t in 1:T],
+    #    ifelse(EP[:vS_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y]), EP[:vS_TES][y, t], min_power(gen[y]) * EP[:eTotalCap][y]))
+    
+
+
 end

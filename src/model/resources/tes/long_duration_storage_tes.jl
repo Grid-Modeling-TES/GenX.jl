@@ -61,14 +61,10 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
     println("TES Long Duration Storage Module")
 
     gen = inputs["RESOURCES"]
-
-    CapacityReserveMargin = setup["CapacityReserveMargin"]
-
     REP_PERIOD = inputs["REP_PERIOD"]     # Number of representative periods
+    hours_per_subperiod = inputs["hours_per_subperiod"] #total number of hours per subperiod
 
     STOR_LONG_DURATION = inputs["STOR_LONG_DURATION_TES"]
-
-    hours_per_subperiod = inputs["hours_per_subperiod"] #total number of hours per subperiod
 
     dfPeriodMap = inputs["Period_Map"] # Dataframe that maps modeled periods to representative periods
     NPeriods = size(inputs["Period_Map"])[1] # Number of modeled periods
@@ -87,15 +83,6 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
     # Build up inventory can be positive or negative
     @variable(EP, vdSOC_TES[y in STOR_LONG_DURATION, w = 1:REP_PERIOD])
 
-    if CapacityReserveMargin > 0
-        # State of charge held in reserve for storage at beginning of each modeled period n
-        @variable(EP, vCAPRES_socw_TES[y in STOR_LONG_DURATION, n in MODELED_PERIODS_INDEX]>=0)
-
-        # Build up in storage inventory held in reserve over each representative period w
-        # Build up inventory can be positive or negative
-        @variable(EP, vCAPRES_dsoc_TES[y in STOR_LONG_DURATION, w = 1:REP_PERIOD])
-    end
-
     ### Constraints ###
 
     # Links last time step with first time step, ensuring position in hour 1 is within eligible change from final hour position
@@ -109,7 +96,7 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
                                                 (EP[:vS_TES][y, hours_per_subperiod * w] -
                                                  vdSOC_TES[y, w])
                                                 -
-                                                (1 / efficiency_down(gen[y]) * EP[:vP][
+                                                (1 / efficiency_down(gen[y]) * EP[:vUSE_TES][
             y, hours_per_subperiod * (w - 1) + 1]) +
                                                 (efficiency_up(gen[y]) * EP[:vCHARGE_TES][
             y, hours_per_subperiod * (w - 1) + 1]))
@@ -135,50 +122,4 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
         vSOCw_TES[y,
             r]==EP[:vS_TES][y, hours_per_subperiod * dfPeriodMap[r, :Rep_Period_Index]] -
                 vdSOC_TES[y, dfPeriodMap[r, :Rep_Period_Index]])
-
-    # Capacity Reserve Margin policy
-    if CapacityReserveMargin > 0
-        # LDES Constraints for storage held in reserve
-
-        # Links last time step with first time step, ensuring position in hour 1 is within eligible change from final hour position
-        # Modified initial virtual state of storage for long-duration storage - initialize wth value carried over from last period
-        # Alternative to cVSoCBalStart_TES constraint which is included when not modeling operations wrapping and long duration storage
-        # Note: tw_min = hours_per_subperiod*(w-1)+1; tw_max = hours_per_subperiod*w
-        @constraint(EP,
-            cVSoCBalLongDurationStorageStart_TES[w = 1:REP_PERIOD, y in STOR_LONG_DURATION],
-            EP[:vCAPRES_socinreserve_TES][y,
-                hours_per_subperiod * (w - 1) + 1]==(1 - self_discharge(gen[y])) *
-                                                    (EP[:vCAPRES_socinreserve_TES][
-                y, hours_per_subperiod * w] - vCAPRES_dsoc_TES[y, w])
-                                                    +
-                                                    (1 / efficiency_down(gen[y]) *
-                                                     EP[:vCAPRES_discharge_TES][
-                y, hours_per_subperiod * (w - 1) + 1]) -
-                                                    (efficiency_up(gen[y]) *
-                                                     EP[:vCAPRES_charge_TES][
-                y, hours_per_subperiod * (w - 1) + 1]))
-
-        # Storage held in reserve at beginning of period w = storage at beginning of period w-1 + storage built up in period w (after n representative periods)
-        ## Multiply storage build up term from prior period with corresponding weight
-        @constraint(EP,
-            cVSoCBalLongDurationStorage_TES[y in STOR_LONG_DURATION,
-                r in MODELED_PERIODS_INDEX],
-            vCAPRES_socw_TES[y,
-                mod1(r + 1, NPeriods)]==vCAPRES_socw_TES[y, r] +
-                                        vCAPRES_dsoc_TES[y, dfPeriodMap[r, :Rep_Period_Index]])
-
-        # Initial reserve storage level for representative periods must also adhere to sub-period storage inventory balance
-        # Initial storage = Final storage - change in storage inventory across representative period
-        @constraint(EP,
-            cVSoCBalLongDurationStorageSub_TES[y in STOR_LONG_DURATION, r in REP_PERIODS_INDEX],
-            vCAPRES_socw_TES[y,r]==EP[:vCAPRES_socinreserve_TES][y,
-                hours_per_subperiod * dfPeriodMap[r, :Rep_Period_Index]] -
-                    vCAPRES_dsoc_TES[y, dfPeriodMap[r, :Rep_Period_Index]])
-
-        # energy held in reserve at the beginning of each modeled period acts as a lower bound on the total energy held in storage
-        @constraint(EP,
-            cSOCMinCapResLongDurationStorage_TES[y in STOR_LONG_DURATION,
-                r in MODELED_PERIODS_INDEX],
-            vSOCw_TES[y, r]>=vCAPRES_socw_TES[y, r])
-    end
 end

@@ -96,7 +96,16 @@ function write_outputs(EP::Model, path::AbstractString, setup::Dict, inputs::Dic
         elapsed_time_tes = @elapsed write_tes(path, inputs, setup, EP)
         println("Time elapsed for writing tes is")
         println(elapsed_time_tes)
+        #if output_settings_d["WriteHydrogenPrices"]
+        #    elapsed_time_heat_prices = @elapsed write_heat_prices(path,
+        #        inputs,
+        #        setup,
+        #        EP)
+        #    println("Time elapsed for writing heat prices is")
+        #    println(elapsed_time_heat_prices)
+        #end
     end
+    
 
     if output_settings_d["WriteCurtailment"]
         elapsed_time_curtailment = @elapsed write_curtailment(path, inputs, setup, EP)

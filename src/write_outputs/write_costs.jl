@@ -11,6 +11,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
     T = inputs["T"]     # Number of time steps (hours)
     VRE_STOR = inputs["VRE_STOR"]
     ELECTROLYZER = inputs["ELECTROLYZER"]
+    TES = inputs["TES"]
 
     cost_list = [
         "cTotal",
@@ -29,6 +30,9 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
     end
     if !isempty(ELECTROLYZER)
         push!(cost_list, "cHydrogenRevenue")
+    end
+    if !isempty(TES)
+        push!(cost_list, "cTESRevenue")
     end
     dfCost = DataFrame(Costs = cost_list)
 
@@ -93,6 +97,10 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
         push!(total_cost,
             (!isempty(inputs["ELECTROLYZER"]) ? -1 * value(EP[:eTotalHydrogenValue]) : 0.0))
     end
+    if !isempty(TES)
+        push!(total_cost,
+            (!isempty(inputs["TES"]) ? -1 * value(EP[:eTotalHydrogenValue_TES]) : 0.0))
+    end
 
     dfCost[!, Symbol("Total")] = total_cost
 
@@ -153,6 +161,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
         tempCStart = 0.0
         tempCNSE = 0.0
         tempHydrogenValue = 0.0
+        tempTESValue = 0.0
         tempCCO2 = 0.0
 
         Y_ZONE = resources_in_zone_by_rid(gen, z)
@@ -196,6 +205,10 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
             eCFixCharge = sum(value.(EP[:eCFixCharge_TES][TES_ZONE]))
             tempCFix += eCFixCharge
             tempCTotal += eCFixCharge
+        end
+        if !isempty(TES_ZONE)
+            tempTESValue = -1 * sum(value.(EP[:eHydrogenValue_TES][TES_ZONE, :]))
+            tempCTotal += tempTESValue
         end
         if !isempty(FLEX_ZONE)
             eCVarFlex_in = sum(value.(EP[:eCVarFlex_in][FLEX_ZONE, :]))
@@ -300,6 +313,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
             tempCNSE *= ModelScalingFactor^2
             tempCStart *= ModelScalingFactor^2
             tempHydrogenValue *= ModelScalingFactor^2
+            tempTESValue *= ModelScalingFactor^2
             tempCCO2 *= ModelScalingFactor^2
         end
         temp_cost_list = [
@@ -319,6 +333,13 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
         end
         if !isempty(ELECTROLYZERS_ZONE)
             push!(temp_cost_list, tempHydrogenValue)
+        end
+        if !isempty(TES)
+            if !isempty(TES_ZONE)
+                push!(temp_cost_list, tempTESValue)
+            else
+                push!(temp_cost_list, "-")
+            end
         end
 
         dfCost[!, Symbol("Zone$z")] = temp_cost_list

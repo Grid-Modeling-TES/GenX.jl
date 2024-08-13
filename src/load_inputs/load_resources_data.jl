@@ -103,7 +103,9 @@ function scale_resources_data!(resource_in::DataFrame, scale_factor::Float64)
         :min_retired_charge_cap_mw,     # to GW
         :min_retired_energy_cap_mw,     # to GW
         :start_cost_per_mw,             # to $M/GW
-        :ccs_disposal_cost_per_metric_ton, :hydrogen_mwh_per_tonne       # to GWh/t
+        :ccs_disposal_cost_per_metric_ton, 
+        :hydrogen_mwh_per_tonne,    # to GWh/t
+        :tes_mwh_per_mmbtu
     ]
 
     scale_columns!(resource_in, columns_to_scale, scale_factor)
@@ -1120,7 +1122,6 @@ function add_resources_to_input_data!(inputs::Dict,
     end
     inputs["NEW_CAP_ENERGY"] = new_cap_energy
     inputs["RET_CAP_ENERGY"] = ret_cap_energy
-    println(inputs["NEW_CAP_ENERGY"])
 
     new_cap_energy_tes = Set{Int64}()
     ret_cap_energy_tes = Set{Int64}()
@@ -1136,9 +1137,6 @@ function add_resources_to_input_data!(inputs::Dict,
     end
     inputs["NEW_CAP_ENERGY_TES"] = new_cap_energy_tes
     inputs["RET_CAP_ENERGY_TES"] = ret_cap_energy_tes
-    println(inputs["NEW_CAP_ENERGY_TES"])
-    
-
 
 
     new_cap_charge = Set{Int64}()
@@ -1155,7 +1153,6 @@ function add_resources_to_input_data!(inputs::Dict,
     end
     inputs["NEW_CAP_CHARGE"] = new_cap_charge
     inputs["RET_CAP_CHARGE"] = ret_cap_charge
-    println(inputs["NEW_CAP_CHARGE"])
 
     new_cap_charge_tes = Set{Int64}()
     ret_cap_charge_tes = Set{Int64}()
@@ -1171,7 +1168,6 @@ function add_resources_to_input_data!(inputs::Dict,
     end
     inputs["NEW_CAP_CHARGE_TES"] = new_cap_charge_tes
     inputs["RET_CAP_CHARGE_TES"] = ret_cap_charge_tes
-    println(inputs["NEW_CAP_CHARGE_TES"])
 
     ## Co-located resources
     # VRE and storage
@@ -1281,7 +1277,6 @@ function add_resources_to_input_data!(inputs::Dict,
 
     # Names of resources
     inputs["RESOURCE_NAMES"] = resource_name(gen)
-    println(inputs["RESOURCE_NAMES"])
 
     # Zones resources are located in
     zones = zone_id(gen)
@@ -1298,7 +1293,6 @@ function add_resources_to_input_data!(inputs::Dict,
     end
 
     inputs["RESOURCES"] = gen
-    println(inputs["RESOURCES"])
     return nothing
 end
 

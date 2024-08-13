@@ -111,36 +111,16 @@ When charging, reducing the charge rate is contributing to upwards reserve and f
 	&  \Theta_{o,z,t} - f^{discharge}_{o,z,t} \geq 0 & \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}
 \end{aligned}
 ```
-Additionally, when reserves are modeled, the maximum charge rate, virtual charge rate,
-and contribution to regulation while charging can be no greater than the available energy storage capacity,
-or the difference between the total energy storage capacity, $\Delta^{total, energy}_{o,z}$, and the state of charge at the end of the previous time period, $\Gamma_{o,z,t-1}$, while accounting for charging losses $\eta_{o,z}^{charge}$. Note that for storage to contribute to reserves down while charging, the storage device must be capable of increasing the charge rate (which increase net load).
-```math
-\begin{aligned}
-	&  \eta_{o,z}^{charge} \times (\Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} + f^{charge}_{o,z,t}) \leq \Delta^{energy, total}_{o,z} - \Gamma_{o,z,t-1} & \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}
-\end{aligned}
-```
-Finally, the constraints on maximum discharge rate are replaced by the following, to account for capacity contributed to regulation and reserves:
-```math
-\begin{aligned}
-	&  \Theta_{o,z,t} + \Theta^{CRM}_{o,z,t} + f^{discharge}_{o,z,t} + r^{discharge}_{o,z,t} \leq \Delta^{total}_{o,z} & \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}\\
-	&  \Theta_{o,z,t} + \Theta^{CRM}_{o,z,t} + f^{discharge}_{o,z,t} + r^{discharge}_{o,z,t} \leq \Gamma_{o,z,t-1} & \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}
-\end{aligned}
-```
-The above reserve related constraints are established by ```storage_all_operational_reserves_tes!()``` in ```storage_all_tes.jl```
 """
 function tes!(EP::Model, inputs::Dict, setup::Dict)
     println("TES Storage Resources Module")
     gen = inputs["RESOURCES"]
     T = inputs["T"]
+    Z = inputs["Z"]     # Number of zones
     TES = inputs["TES"]
 
     p = inputs["hours_per_subperiod"]
     rep_periods = inputs["REP_PERIOD"]
-
-    EnergyShareRequirement = setup["EnergyShareRequirement"]
-    CapacityReserveMargin = setup["CapacityReserveMargin"]
-    IncludeLossesInESR = setup["IncludeLossesInESR"]
-    StorageVirtualDischarge = setup["StorageVirtualDischarge"]
 
     if !isempty(TES)
         investment_energy_tes!(EP, inputs, setup)
@@ -157,33 +137,4 @@ function tes!(EP::Model, inputs::Dict, setup::Dict)
         storage_asymmetric_tes!(EP, inputs, setup)
     end
 
-    # ESR Lossses
-    if EnergyShareRequirement >= 1
-        if IncludeLossesInESR == 1
-            @expression(EP,
-                eESRStor_TES[ESR = 1:inputs["nESR"]],
-                sum(inputs["dfESR"][z, ESR] * sum(EP[:eELOSS_TES][y]
-                    for y in intersect(resources_in_zone_by_rid(gen, z), TES))
-                for z in findall(x -> x > 0, inputs["dfESR"][:, ESR])))
-            add_similar_to_expression!(EP[:eESR], -eESRStor_TES)
-        end
-    end
-
-    # Capacity Reserves Margin policy
-    if CapacityReserveMargin > 0
-        @expression(EP,
-            eCapResMarBalanceStor_TES[res = 1:inputs["NCapacityReserveMargin"], t = 1:T],
-            sum(derating_factor(gen[y], tag = res) * (EP[:vP][y, t] - EP[:vCHARGE_TES][y, t])
-            for y in TES))
-        if StorageVirtualDischarge > 0
-            @expression(EP,
-                eCapResMarBalanceStorVirtual_TES[res = 1:inputs["NCapacityReserveMargin"],
-                    t = 1:T],
-                sum(derating_factor(gen[y], tag = res) *
-                    (EP[:vCAPRES_discharge_TES][y, t] - EP[:vCAPRES_charge_TES][y, t])
-                for y in TES))
-            add_similar_to_expression!(eCapResMarBalanceStor_TES, eCapResMarBalanceStorVirtual_TES)
-        end
-        add_similar_to_expression!(EP[:eCapResMarBalance], eCapResMarBalanceStor_TES)
-    end
 end

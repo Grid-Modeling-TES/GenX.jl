@@ -164,9 +164,12 @@ function electrolyzer!(EP::Model, inputs::Dict, setup::Dict)
             sum(EP[:vP][y, t]
             for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY))>=sum(EP[:vUSE][y,t]
             for y in intersect(resources_in_zone_by_rid(gen,z), ELECTROLYZERS)) + sum(EP[:vCHARGE][y,t]
-            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)) + sum(EP[:vCHARGE_TES][y,t]
-            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, TES)))
+            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)))
     end
+
+    # removed the following as TES doesn't qualify here
+    #   + sum(EP[:vCHARGE_TES][y,t]
+    #        for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, TES))
 
     ### Energy Share Requirement Policy ###
     # Since we're using vUSE to denote electrolyzer consumption, we subtract this from the eESR Energy Share Requirement balance to increase demand for clean resources if desired

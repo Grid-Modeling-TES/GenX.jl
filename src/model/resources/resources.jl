@@ -659,13 +659,13 @@ end
 
 # Reservoir hydro and storage
 const default_percent = 1.0
-efficiency_up(r::T) where {T <: Union{Hydro, Storage, Tes}} = get(r, :eff_up, default_percent)
-function efficiency_down(r::T) where {T <: Union{Hydro, Storage, Tes}}
+efficiency_up(r::T) where {T <: Union{Hydro, Storage,Tes}} = get(r, :eff_up, default_percent)
+function efficiency_down(r::T) where {T <: Union{Hydro, Storage,Tes}}
     get(r, :eff_down, default_percent)
 end
 
 # Ramp up and down
-const VarPower = Union{Electrolyzer, Hydro, Thermal}
+const VarPower = Union{Electrolyzer, Hydro, Thermal, Tes}
 min_power(r::VarPower) = get(r, :min_power, default_zero)
 ramp_up_fraction(r::VarPower) = get(r, :ramp_up_percentage, default_percent)
 ramp_down_fraction(r::VarPower) = get(r, :ramp_dn_percentage, default_percent)
@@ -806,6 +806,9 @@ self_discharge(r::Tes) = r.self_disch
 min_duration(r::Tes) = r.min_duration
 max_duration(r::Tes) = r.max_duration
 var_om_cost_per_mwh_in(r::Tes) = get(r, :var_om_cost_per_mwh_in, default_zero)
+tes_min_kmmbtu(r::Tes) = r.tes_min_kmmbtu
+tes_mwh_per_mmbtu(r::Tes) = r.tes_mwh_per_mmbtu
+heat_price_per_mmbtu(r::Tes) = r.heat_price_per_mmbtu
 function asymmetric_tes(rs::Vector{T}) where {T <: AbstractResource}
     findall(r -> isa(r, Tes) && r.model == 2, rs)
 end

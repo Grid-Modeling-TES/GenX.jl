@@ -111,7 +111,10 @@ function investment_charge_tes!(EP::Model, inputs::Dict, setup::Dict)
     end
 
     ### Constratints ###
-
+    # Charge capacity for TES is 3x the discharge capacity
+    @constraint(EP, cChargeCapRatio[y in TES],
+    EP[:eTotalCapCharge_TES][y] == (3*EP[:eTotalCap][y]))
+    
     if MultiStage == 1
         # Existing capacity variable is equal to existing capacity specified in the input file
         @constraint(EP,

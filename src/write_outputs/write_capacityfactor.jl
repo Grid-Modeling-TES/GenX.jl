@@ -13,6 +13,7 @@ function write_capacityfactor(path::AbstractString, inputs::Dict, setup::Dict, E
     HYDRO_RES = inputs["HYDRO_RES"]
     MUST_RUN = inputs["MUST_RUN"]
     ELECTROLYZER = inputs["ELECTROLYZER"]
+    TES = inputs["TES"]
     VRE_STOR = inputs["VRE_STOR"]
 
     dfCapacityfactor = DataFrame(Resource = inputs["RESOURCE_NAMES"],
@@ -71,6 +72,15 @@ function write_capacityfactor(path::AbstractString, inputs::Dict, setup::Dict, E
                                                     scale_factor
         dfCapacityfactor.CapacityFactor[ELECTROLYZER] .= (dfCapacityfactor.AnnualSum[ELECTROLYZER] ./
                                                           dfCapacityfactor.Capacity[ELECTROLYZER]) /
+                                                         sum(inputs["omega"][t]
+        for t in 1:T)
+    end
+    if (!isempty(TES))
+        dfCapacityfactor.AnnualSum[TES] .= value.(EP[:vUSE_TES][TES,
+                                                        :]).data * inputs["omega"] *
+                                                    scale_factor
+        dfCapacityfactor.CapacityFactor[TES] .= (dfCapacityfactor.AnnualSum[TES] ./
+                                                          dfCapacityfactor.Capacity[TES]) /
                                                          sum(inputs["omega"][t]
         for t in 1:T)
     end
