@@ -1,2 +1,4 @@
-Resource,Zone,Model,New_Build,Can_Retire,Existing_Cap_MW,Existing_Cap_MWh,Min_Cap_MW,Min_Cap_MWh,Inv_Cost_per_MWyr,Inv_Cost_per_MWhyr,Fixed_OM_Cost_per_MWyr,Fixed_OM_Cost_per_MWhyr,Var_OM_Cost_per_MWh,Var_OM_Cost_per_MWh_In,Self_Disch,Eff_Up,Eff_Down,Min_Duration,Max_Duration,Qualified_Hydrogen_Supply,region,cluster,Existing_Charge_Cap_MW,Inv_Cost_Charge_per_MWyr,Fixed_OM_Cost_Charge_per_MWyr
-MA_TES,1,2,1,0,0,0,0,0,20000,400,8000,0,0,0,0,0.95,0.95,1,50,0,MA,0,0,6667,2667
+Resource,Zone,Model,New_Build,Can_Retire,Existing_Cap_MW,Existing_Cap_MWh,Min_Cap_MW,Min_Cap_MWh,Inv_Cost_per_MWyr,Inv_Cost_per_MWhyr,Fixed_OM_Cost_per_MWyr,Fixed_OM_Cost_per_MWhyr,Var_OM_Cost_per_MWh,Var_OM_Cost_per_MWh_In,Self_Disch,Eff_Up,Eff_Down,Min_Duration,Max_Duration,Qualified_Hydrogen_Supply,region,cluster,Existing_Charge_Cap_MW,Inv_Cost_Charge_per_MWyr,Fixed_OM_Cost_Charge_per_MWyr,Ramp_Up_Percentage,Ramp_Dn_Percentage,Min_Power,TES_MWh_per_MMBtu,TES_Min_kMMBTU,Heat_Price_Per_MMBTU
+MA_TES,1,2,1,0,0,0,0,0,19026,381,7600,0,0,0,0,1.0,1.0,1,50,0,MA,0,0,6342,0,1,1,0.80,0.2638,1000,10
+CT_TES,2,2,1,0,0,0,0,0,19026,381,7600,0,0,0,0,1.0,1.0,1,50,0,MA,0,0,6342,0,1,1,0.80,0.2638,1000,10
+ME_TES,3,2,1,0,0,0,0,0,19026,381,7600,0,0,0,0,1.0,1.0,1,50,0,MA,0,0,6342,0,1,1,0.80,0.2638,1000,10

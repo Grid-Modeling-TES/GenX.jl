@@ -85,9 +85,14 @@ function write_power_balance(path::AbstractString, inputs::Dict, setup::Dict, EP
         end
         if !isempty(intersect(resources_in_zone_by_rid(gen, z), TES))
             TES_ZONE = intersect(resources_in_zone_by_rid(gen, z), TES)
-            powerbalance[(z - 1) * L + 12, :] = sum(value.(EP[:vP][TES, :]),
+
+            is_electrolyzer_empty = isempty(ELECTROLYZER)
+            discharge_idx = is_electrolyzer_empty ? 11 : 12
+            charge_idx = is_electrolyzer_empty ? 12 : 13
+
+            powerbalance[(z - 1) * L + discharge_idx, :] = sum(value.(EP[:vP][TES, :]),
                 dims = 1)
-            powerbalance[(z - 1) * L + 13, :] = (-1) * sum(
+            powerbalance[(z - 1) * L + charge_idx, :] = (-1) * sum(
                 (value.(EP[:vCHARGE_TES][TES_ZONE,:]).data),
                 dims = 1)
         end
