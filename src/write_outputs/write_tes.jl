@@ -53,16 +53,16 @@ function write_tes(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
             end
         end  
         dfStorage = DataFrame(Resource = Resource_header, Zone = Zones, AnnualSum = Array{Union{Missing, Float64}}(undef, 15))
+        
+        if setup["ParameterScale"] == 1
+            storagevcapvalue *= ModelScalingFactor
+        end
+    
+        dfStorage.AnnualSum .= storagevcapvalue * inputs["omega"]
+    
+        dfStorage = hcat(dfStorage, DataFrame(storagevcapvalue, :auto))
+        auxNew_Names = [Symbol("Resource"); Symbol("Zone"); Symbol("Total"); [Symbol("t$t") for t in 1:T]]
+        rename!(dfStorage, auxNew_Names)
+        CSV.write(joinpath(path, "tes.csv"), dftranspose(dfStorage, false), header = false)
     end
-
-    if setup["ParameterScale"] == 1
-        storagevcapvalue *= ModelScalingFactor
-    end
-
-    dfStorage.AnnualSum .= storagevcapvalue * inputs["omega"]
-
-    dfStorage = hcat(dfStorage, DataFrame(storagevcapvalue, :auto))
-    auxNew_Names = [Symbol("Resource"); Symbol("Zone"); Symbol("Total"); [Symbol("t$t") for t in 1:T]]
-    rename!(dfStorage, auxNew_Names)
-    CSV.write(joinpath(path, "tes.csv"), dftranspose(dfStorage, false), header = false)
 end
