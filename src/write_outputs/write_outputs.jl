@@ -94,6 +94,17 @@ function write_outputs(EP::Model, path::AbstractString, setup::Dict, inputs::Dic
 
     if output_settings_d["WriteTes"]
         elapsed_time_tes = @elapsed write_tes(path, inputs, setup, EP)
+
+        if setup["TESHourlyMatching"] == 1 &&
+            output_settings_d["WriteHourlyMatchingPrices"]
+             elapsed_time_hourly_matching_prices = @elapsed write_hourly_matching_prices_tes(
+                 path,
+                 inputs,
+                 setup,
+                 EP)
+             println("Time elapsed for writing hourly matching prices is")
+             println(elapsed_time_hourly_matching_prices)
+         end
         println("Time elapsed for writing tes is")
         println(elapsed_time_tes)
         #if output_settings_d["WriteHydrogenPrices"]

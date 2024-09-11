@@ -167,19 +167,18 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
 
 
     ### Hydrogen Hourly Supply Matching Constraint (Constraint #6) ###
-    # Requires generation from qualified resources (indicated by Qualified_Hydrogen_Supply==1 in the resource .csv files)
+    # Requires generation from qualified resources (indicated by Qualified_TES_Supply==1 in the resource .csv files)
     # from within the same zone as the electrolyzers are located to be >= hourly consumption from electrolyzers in the zone
     # (and any charging by qualified storage within the zone used to help increase electrolyzer utilization).
-    #if setup["HydrogenHourlyMatching"] == 1
-    #    HYDROGEN_ZONES = unique(zone_id.(gen.Electrolyzer))
-    #    QUALIFIED_SUPPLY = ids_with(gen, qualified_hydrogen_supply)
-    #    @constraint(EP, cHourlyMatching[z in HYDROGEN_ZONES, t in 1:T],
-    #        sum(EP[:vP][y, t]
-    #        for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY))>=sum(EP[:vUSE][y,t]
-    #        for y in intersect(resources_in_zone_by_rid(gen,z), ELECTROLYZERS)) + sum(EP[:vCHARGE][y,t]
-    #        for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)) + sum(EP[:vCHARGE_TES][y,t]
-    #        for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, TES)))
-    #end
+    STORAGE = inputs["STOR_ALL"]
+    if setup["TESHourlyMatching"] == 1
+       TES_ZONES = unique(zone_id.(gen.Tes))
+       QUALIFIED_SUPPLY = ids_with(gen, qualified_tes_supply)
+       @constraint(EP, cHourlyMatching_TES[z in TES_ZONES, t in 1:T],
+           sum(EP[:vP][y, t] for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY))>= sum(EP[:vCHARGE][y,t]
+           for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)) + sum(EP[:vCHARGE_TES][y,t]
+           for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, TES)))
+    end
 
 
     # Attemps at constraining production in each hour are below - these tend to make the model non-linear.

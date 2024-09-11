@@ -594,6 +594,10 @@ function qualified_hydrogen_supply(r::AbstractResource)
     get(r, :qualified_hydrogen_supply, default_zero)
 end
 
+function qualified_tes_supply(r::AbstractResource)
+    get(r, :qualified_tes_supply, default_zero)
+end
+
 retrofit_id(r::AbstractResource)::String = get(r, :retrofit_id, "None")
 function retrofit_efficiency(r::AbstractResource)
     is_retrofit_option(r) && return get(r, :retrofit_efficiency, 1.0)
