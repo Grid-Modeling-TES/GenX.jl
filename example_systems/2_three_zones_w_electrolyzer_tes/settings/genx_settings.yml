@@ -8,7 +8,7 @@ TimeDomainReduction: 1 # Time domain reduce (i.e. cluster) inputs based on Deman
 WriteShadowPrices: 1 # Write shadow prices of LP or relaxed MILP; 0 = not active; 1 = active
 NetworkExpansion: 1 # Transmission network expansionl; 0 = not active; 1 = active systemwide
 EnergyShareRequirement: 0 # Minimum qualifying renewables penetration; 0 = not active; 1 = active systemwide
-CapacityReserveMargin: 0 # Number of capacity reserve margin constraints; 0 = not active; 1 = active systemwide
+CapacityReserveMargin: 1 # Number of capacity reserve margin constraints; 0 = not active; 1 = active systemwide
 CO2Cap: 2 # CO2 emissions cap; 0 = not active (no CO2 emission limit); 1 = mass-based emission limit constraint; 2 = demand + rate-based emission limit constraint; 3 = generation + rate-based emission limit constraint
 #MinCapReq: 0  # Activate minimum technology carveout constraints; 0 = not active; 1 = active
 MaxCapReq: 1  # Activate maximum technology carveout constraints; 0 = not active; 1 = active
