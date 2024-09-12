@@ -177,7 +177,7 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
        @constraint(EP, cHourlyMatching_TES[z in TES_ZONES, t in 1:T],
            sum(EP[:vP][y, t] for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY))>= sum(EP[:vCHARGE][y,t]
            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)) + sum(EP[:vCHARGE_TES][y,t]
-           for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, TES)))
+           for y in intersect(resources_in_zone_by_rid(gen,z), TES)))
     end
 
 
