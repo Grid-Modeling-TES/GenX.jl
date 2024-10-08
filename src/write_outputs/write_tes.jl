@@ -52,7 +52,7 @@ function write_tes(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
                 end
             end
         end  
-        dfStorage = DataFrame(Resource = Resource_header, Zone = Zones, AnnualSum = Array{Union{Missing, Float64}}(undef, 15))
+        dfStorage = DataFrame(Resource = Resource_header, Zone = Zones, AnnualSum = Array{Union{Missing, Float64}}(undef, (length(TES)*5)))
         
         if setup["ParameterScale"] == 1
             storagevcapvalue *= ModelScalingFactor
