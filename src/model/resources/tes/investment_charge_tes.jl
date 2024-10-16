@@ -42,6 +42,7 @@ function investment_charge_tes!(EP::Model, inputs::Dict, setup::Dict)
     println("TES Charge Investment Module")
 
     gen = inputs["RESOURCES"]
+    T = inputs["T"]     # Number of time steps (hours)
 
     MultiStage = setup["MultiStage"]
 
@@ -113,7 +114,7 @@ function investment_charge_tes!(EP::Model, inputs::Dict, setup::Dict)
     ### Constraints ###
     # Constrain charge to discharge capacity ratio
     @constraint(EP, cChargeCapRatio[y in TES],
-    EP[:eTotalCapCharge_TES][y] == (3*EP[:eTotalCap][y]))
+    EP[:eTotalCapCharge_TES][y] == (charge_discharge_ratio(gen[y])*EP[:eTotalCap][y]))
     
     # Maximum charging rate must be less than charge power rating
     @constraint(EP,

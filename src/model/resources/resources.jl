@@ -813,6 +813,7 @@ var_om_cost_per_mwh_in(r::Tes) = get(r, :var_om_cost_per_mwh_in, default_zero)
 tes_min_kmmbtu(r::Tes) = r.tes_min_kmmbtu
 tes_mwh_per_mmbtu(r::Tes) = r.tes_mwh_per_mmbtu
 heat_price_per_mmbtu(r::Tes) = r.heat_price_per_mmbtu
+charge_discharge_ratio(r::Tes) = r.charge_discharge_ratio
 function asymmetric_tes(rs::Vector{T}) where {T <: AbstractResource}
     findall(r -> isa(r, Tes) && r.model == 2, rs)
 end

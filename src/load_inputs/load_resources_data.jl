@@ -104,8 +104,9 @@ function scale_resources_data!(resource_in::DataFrame, scale_factor::Float64)
         :min_retired_energy_cap_mw,     # to GW
         :start_cost_per_mw,             # to $M/GW
         :ccs_disposal_cost_per_metric_ton, 
-        :hydrogen_mwh_per_tonne,    # to GWh/t
-        :tes_mwh_per_mmbtu
+        :hydrogen_mwh_per_tonne,        # to GWh/t
+        :tes_mwh_per_mmbtu,
+        :charge_discharge_ratio
     ]
 
     scale_columns!(resource_in, columns_to_scale, scale_factor)
