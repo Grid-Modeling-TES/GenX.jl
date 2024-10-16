@@ -1,24 +1,20 @@
 @doc raw"""
 	storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
 
-Sets up variables and constraints common to all storage resources. See ```storage()``` in ```storage.jl``` for description of constraints.
+Sets up variables and constraints common to all TES resources. See ```tes()``` in ```tes.jl``` for description of constraints.
 """
 function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
-    # Setup variables, constraints, and expressions common to all storage resources
+    # Setup variables, constraints, and expressions common to all TES resources
     println("TES Storage Core Resources Module")
 
     gen = inputs["RESOURCES"]
-    OperationalReserves = setup["OperationalReserves"]
-    CapacityReserveMargin = setup["CapacityReserveMargin"]
-
-    virtual_discharge_cost = inputs["VirtualChargeDischargeCost"]
 
     T = inputs["T"]     # Number of time steps (hours)
     Z = inputs["Z"]     # Number of zones
     p = inputs["hours_per_subperiod"]
 
     TES = inputs["TES"]
-    STOR_SHORT_DURATION = inputs["STOR_SHORT_DURATION_TES"]
+    SHORT_DURATION_TES = inputs["SHORT_DURATION_TES"]
     representative_periods = inputs["REP_PERIOD"]
 
     START_SUBPERIODS = inputs["START_SUBPERIODS"]
@@ -41,7 +37,7 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
 
     ## Objective Function Expressions ##
 
-    #Variable costs of "charging" for technologies "y" during hour "t" in zone "z"
+    #Variable costs of "charging" for technologies "y" during hour "t" in zone "z". For TES, we use this to represent the tariff paid to charge the modules.
     @expression(EP,
         eCVar_in_TES[y in TES, t = 1:T],
         inputs["omega"][t]*var_om_cost_per_mwh_in(gen[y])*vCHARGE_TES[y, t])
@@ -115,8 +111,8 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
 
     # Links state of charge in first time step with decisions in last time step of each subperiod
     # We use a modified formulation of this constraint (cSoCBalLongDurationStorageStart_TES) when operations wrapping and long duration storage are being modeled
-    if representative_periods > 1 && !isempty(inputs["STOR_LONG_DURATION_TES"])
-        CONSTRAINTSET = STOR_SHORT_DURATION
+    if representative_periods > 1 && !isempty(inputs["LONG_DURATION_TES"])
+        CONSTRAINTSET = SHORT_DURATION_TES
     else
         CONSTRAINTSET = TES
     end
@@ -158,18 +154,18 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
     
     ### Maximum ramp up and down between consecutive hours - Not applicable as ramp rates are 100% between hours for TES
 
-    ### Minimum heat production constraint (if any)
+    ### Minimum heat production constraint (if any) - currently not used.
     #kmmbtu_to_mmbtu = 10^3
     #@constraint(EP,
-    #    cHydrogenMin_TES[y in TES],
+    #    cTESMin[y in TES],
     #    sum(inputs["omega"][t] * EP[:eTesProduction][y, t] / tes_mwh_per_mmbtu(gen[y])
     #    for t in 1:T)>=tes_min_kmmbtu(gen[y]) * kmmbtu_to_mmbtu)
 
 
-    ### Hydrogen Hourly Supply Matching Constraint (Constraint #6) ###
+    ### TES Hourly Supply Matching Constraint ###
     # Requires generation from qualified resources (indicated by Qualified_TES_Supply==1 in the resource .csv files)
-    # from within the same zone as the electrolyzers are located to be >= hourly consumption from electrolyzers in the zone
-    # (and any charging by qualified storage within the zone used to help increase electrolyzer utilization).
+    # from within the same zone as the TES are located to be >= hourly consumption from TES in the zone
+    # (and any charging by qualified storage within the zone used to help increase TES utilization).
     STORAGE = inputs["STOR_ALL"]
     if setup["TESHourlyMatching"] == 1
        TES_ZONES = unique(zone_id.(gen.Tes))
@@ -179,58 +175,6 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
            for y in intersect(resources_in_zone_by_rid(gen,z), QUALIFIED_SUPPLY, STORAGE)) + sum(EP[:vCHARGE_TES][y,t]
            for y in intersect(resources_in_zone_by_rid(gen,z), TES)))
     end
-
-
-    # Attemps at constraining production in each hour are below - these tend to make the model non-linear.
-    #=     @variable(EP, vUSE_TES[y in TES, t in 1:T]>=0)
-    @variable(EP, vd1[y in TES, t in 1:T]>=0)
-    @variable(EP, vd2[y in TES, t in 1:T]>=0)
-    MMM = 15000
-
-    @constraints(EP, begin
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] <= EP[:vS_TES][y, t]
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y])
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] >= (EP[:vS_TES][y, t] - (MMM*(1-vd1[y, t])))
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] >= ((min_power(gen[y]) * EP[:eTotalCap][y]) - (MMM*(1-vd2[y, t])))
-        [y in TES, t in 1:T],
-        (vd1[y, t] + vd2[y, t]) == 1
-    end) =#
-
-#=     @variable(EP, vBinary[y in TES, t in 1:T] in Semiinteger(0, 1))
-    MMM = 15000
-    @constraints(EP, begin
-        [y in TES, t in 1:T],
-        ((min_power(gen[y]) * EP[:eTotalCap][y]) -  EP[:vS_TES][y, t]) <= (MMM*vBinary[y, t])
-
-        [y in TES, t in 1:T],
-        (EP[:vS_TES][y, t] - (min_power(gen[y]) * EP[:eTotalCap][y])) <= (MMM*(1-vBinary[y, t]))
-    end)
-
-    @constraints(EP, begin
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] <= EP[:vS_TES][y, t]
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y])
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] >= (EP[:vS_TES][y, t] - (MMM*(1-vBinary[y, t])))
-        [y in TES, t in 1:T],
-        EP[:vUSE_TES][y, t] >= ((min_power(gen[y]) * EP[:eTotalCap][y]) - (MMM*vBinary[y, t]))
-    end) =#
-
-    #@expression(EP, eTesProduction[y in TES, t in 1:T],
-    #    if EP[:vS_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y])
-    #        EP[:vS_TES][y, t]
-    #    else
-    #        min_power(gen[y]) * EP[:eTotalCap][y]
-    #    end)
-    #min(EP[:vS_TES][y, t],(min_power(gen[y]) * EP[:eTotalCap][y])))
-    #@expression(EP, eTesProduction[y in TES, t in 1:T],
-    #    ifelse(EP[:vS_TES][y, t] <= (min_power(gen[y]) * EP[:eTotalCap][y]), EP[:vS_TES][y, t], min_power(gen[y]) * EP[:eTotalCap][y]))
-    
 
 
 end

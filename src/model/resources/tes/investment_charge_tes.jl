@@ -1,7 +1,7 @@
 @doc raw"""
 	investment_charge_tes!(EP::Model, inputs::Dict)
 
-This function defines the expressions and constraints keeping track of total available storage charge capacity across all resources as well as constraints on capacity retirements. The function also adds investment and fixed O\&M related costs related to charge capacity to the objective function.
+This function defines the expressions and constraints keeping track of total available TES storage charge capacity across all resources as well as constraints on capacity retirements. The function also adds investment and fixed O\&M related costs related to charge capacity to the objective function.
 
 The total capacity of each resource is defined as the sum of the existing capacity plus the newly invested capacity minus any retired capacity.
 
@@ -110,11 +110,17 @@ function investment_charge_tes!(EP::Model, inputs::Dict, setup::Dict)
         add_to_expression!(EP[:eObj], eTotalCFixCharge_TES)
     end
 
-    ### Constratints ###
-    # Charge capacity for TES is 3x the discharge capacity
+    ### Constraints ###
+    # Constrain charge to discharge capacity ratio
     @constraint(EP, cChargeCapRatio[y in TES],
     EP[:eTotalCapCharge_TES][y] == (3*EP[:eTotalCap][y]))
     
+    # Maximum charging rate must be less than charge power rating
+    @constraint(EP,
+        [y in TES, t in 1:T],
+        EP[:vCHARGE_TES][y, t]<=EP[:eTotalCapCharge_TES][y])
+
+
     if MultiStage == 1
         # Existing capacity variable is equal to existing capacity specified in the input file
         @constraint(EP,

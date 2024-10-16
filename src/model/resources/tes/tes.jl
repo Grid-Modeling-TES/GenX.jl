@@ -1,39 +1,7 @@
 @doc raw"""
 	tes!(EP::Model, inputs::Dict, setup::Dict)
-A wide range of energy storage devices (all $o \in \mathcal{O}$) can be modeled in GenX, using one of two generic storage formulations: (1) storage technologies with symmetric charge and discharge capacity (all $o \in \mathcal{O}^{sym}$), such as Lithium-ion batteries and most other electrochemical storage devices that use the same components for both charge and discharge; and (2) storage technologies that employ distinct and potentially asymmetric charge and discharge capacities (all $o \in \mathcal{O}^{asym}$), such as most thermal storage technologies or hydrogen electrolysis/storage/fuel cell or combustion turbine systems.
+A range of Thermal Energy Storage (TES) (all $o \in \mathcal{O}$) can be modeled in GenX, based on the GenX formulation for storage technologies that employ distinct and potentially asymmetric charge and discharge capacities (all $o \in \mathcal{O}^{asym}$), such as most thermal storage technologies or hydrogen electrolysis/storage/fuel cell or combustion turbine systems.
 
-If a capacity reserve margin is modeled, variables for virtual charge, $\Pi^{CRM}_{o,z,t}$, and virtual discharge, $\Theta^{CRM}_{o,z,t}$, are created to represent 
-	contributions that a storage device makes to the capacity reserve margin without actually generating power. (This functionality can be turned off with the parameter StorageVirtualDischarge in the GenX settings file.) These represent power that the storage device could 
-	have discharged or consumed if called upon to do so, based on its available state of charge. Importantly, a dedicated set of variables (those of the form $\Pi^{CRM}_{o,z,t}, \Theta^{CRM}_{o,z,t}$) 
-	and constraints are created to ensure that any virtual contributions to the capacity reserve margin could be made as actual charge/discharge if necessary without 
-	affecting system operations in any other timesteps. If a capacity reserve margin is not modeled, all related variables are fixed at 0. The overall contribution 
-	of storage devices to the system's capacity reserve margin in timestep $t$ is equal to $\sum_{y \in \mathcal{O}} \epsilon_{y,z,p}^{CRM} \times \left(\Theta_{y,z,t} + \Theta^{CRM}_{o,z,t} - \Pi^{CRM}_{o,z,t} - \Pi_{y,z,t} \right)$, 
-	and includes both actual and virtual charge and discharge.
-```math
-\begin{aligned}
-	&  \Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} \leq \Delta^{total}_{o,z} & \quad \forall o \in \mathcal{O}^{sym}, z \in \mathcal{Z}, t \in \mathcal{T}\\
-	&  \Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} + \Theta_{o,z,t} + \Theta^{CRM}_{o,z,t} \leq \Delta^{total}_{o,z} & \quad \forall o \in \mathcal{O}^{sym}, z \in \mathcal{Z}, t \in \mathcal{T}
-\end{aligned}
-```
-
-**Storage with symmetric charge and discharge capacity**
-For storage technologies with symmetric charge and discharge capacity (all $o \in \mathcal{O}^{sym}$), charge rate, $\Pi_{o,z,t}$, and virtual charge rate, $\Pi^{CRM}_{o,z,t}$, are jointly constrained by the total installed power capacity, $\Omega_{o,z}$. Since storage resources generally represent a `cluster' of multiple similar storage devices of the same type/cost in the same zone, GenX permits storage resources to simultaneously charge and discharge (as some units could be charging while others discharge), with the simultaenous sum of charge, $\Pi_{o,z,t}$, discharge, $\Theta_{o,z,t}$, virtual charge, $\Pi^{CRM}_{o,z,t}$, and virtual discharge, $\Theta^{CRM}_{o,z,t}$, also limited by the total installed power capacity, $\Delta^{total}_{o,z}$. These two constraints are as follows:
-```math
-\begin{aligned}
-&  \Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} \leq \Delta^{total}_{o,z} & \quad \forall o \in \mathcal{O}^{sym}, z \in \mathcal{Z}, t \in \mathcal{T}\\
-&  \Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} + \Theta_{o,z,t} + \Theta^{CRM}_{o,z,t} \leq \Delta^{total}_{o,z} & \quad \forall o \in \mathcal{O}^{sym}, z \in \mathcal{Z}, t \in \mathcal{T}
-\end{aligned}
-```
-These constraints are created with the function ```storage_symmetric!()``` in ```storage_symmetric.jl```.
-If reserves are modeled, the following two constraints replace those above:
-```math
-\begin{aligned}
-&  \Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} + f^{charge}_{o,z,t} \leq \Delta^{total}_{o,z} & \quad \forall o \in \mathcal{O}^{sym}, z \in \mathcal{Z}, t \in \mathcal{T}\\
-&  \Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} + f^{charge}_{o,z,t} + \Theta_{o,z,t} + \Theta^{CRM}_{o,z,t} + f^{discharge}_{o,z,t} + r^{discharge}_{o,z,t} \leq \Delta^{total}_{o,z} & \quad \forall o \in \mathcal{O}^{sym}, z \in \mathcal{Z}, t \in \mathcal{T} \\
-\end{aligned}
-```
-where $f^{charge}_{o,z,t}$ is the contribution of storage resources to frequency regulation while charging, $f^{discharge}_{o,z,t}$ is the contribution of storage resources to frequency regulation while discharging, and $r^{discharge}_{o,z,t}$ is the contribution of storage resources to upward reserves while discharging. Note that as storage resources can contribute to regulation and reserves while either charging or discharging, the proxy variables $f^{charge}_{o,z,t}, f^{discharge}_{o,z,t}$ and $r^{charge}_{o,z,t}, r^{discharge}_{o,z,t}$ are created for storage resources where the total contribution to regulation and reserves, $f_{o,z,t}, r_{o,z,t}$ is the sum of the proxy variables.
-These constraints are created with the function ```storage_symmetric_operational_reserves!()``` in ```storage_symmetric.jl```.
 **Storage with asymmetric charge and discharge capacity**
 For storage technologies with asymmetric charge and discharge capacities (all $o \in \mathcal{O}^{asym}$), charge rate, $\Pi_{o,z,t}$, is constrained by the total installed charge capacity, $\Delta^{total, charge}_{o,z}$, as follows:
 ```math
@@ -41,7 +9,7 @@ For storage technologies with asymmetric charge and discharge capacities (all $o
 	&  \Pi_{o,z,t} + \Pi^{CRM}_{o,z,t} \leq \Delta^{total, charge}_{o,z} & \quad \forall o \in \mathcal{O}^{asym}, z \in \mathcal{Z}, t \in \mathcal{T}
 \end{aligned}
 ```
-These constraints are created with the function ```storage_asymmetric_tes()``` in ```storage_asymmetric_tes.jl```.
+
 If reserves are modeled, the above constraint is replaced by the following:
 ```math
 \begin{aligned}
@@ -49,7 +17,6 @@ If reserves are modeled, the above constraint is replaced by the following:
 \end{aligned}
 ```
 where $f^{+}_{y=o,z,t}$ is the contribution of storage resources to frequency regulation while charging.
-These constraints are created with the function ```storage_symmetric_operational_reserves_tes!()``` in ```storage_asymmetric_tes.jl```.
 **All storage resources**
 The following constraints apply to all storage resources, $o \in \mathcal{O}$, regardless of whether the charge/discharge capacities are symmetric or asymmetric.
 The following two constraints track the state of charge of the storage resources at the end of each time period, relating the volume of energy stored at the end of the time period, $\Gamma_{o,z,t}$, to the state of charge at the end of the prior time period, $\Gamma_{o,z,t-1}$, the charge and discharge decisions in the current time period, $\Pi_{o,z,t}, \Theta_{o,z,t}$, and the self discharge rate for the storage resource (if any), $\eta_{o,z}^{loss}$.  The first of these two constraints enforces storage inventory balance for interior time steps $(t \in \mathcal{T}^{interior})$, while the second enforces storage balance constraint for the initial time step $(t \in \mathcal{T}^{start})$.
@@ -57,19 +24,6 @@ The following two constraints track the state of charge of the storage resources
 \begin{aligned}
 	&  \Gamma_{o,z,t} =\Gamma_{o,z,t-1} - \frac{1}{\eta_{o,z}^{discharge}}\Theta_{o,z,t} + \eta_{o,z}^{charge}\Pi_{o,z,t} - \eta_{o,z}^{loss}\Gamma_{o,z,t-1}  \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}^{interior}\\
 	&  \Gamma_{o,z,t} =\Gamma_{o,z,t+\tau^{period}-1} - \frac{1}{\eta_{o,z}^{discharge}}\Theta_{o,z,t} + \eta_{o,z}^{charge}\Pi_{o,z,t} - \eta_{o,z}^{loss}\Gamma_{o,z,t+\tau^{period}-1}  \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}^{start}
-\end{aligned}
-```
-If a capacity reserve margin is modeled, then the following constraints track the relationship between the virtual charge, $\Pi^{CRM}_{o,z,t}$, and virtual discharge, $\Theta^{CRM}_{o,z,t}$, variables and a third variable, $\Gamma^{CRM}_{o,z,t}$, representing the amount of state of charge that must be held in reserve to enable these virtual capacity reserve margin contributions, ensuring that the storage device could deliver its pledged capacity if called upon to do so without affecting its operations in other timesteps. $\Gamma^{CRM}_{o,z,t}$ is tracked similarly to the devices overall state of charge based on its value in the previous timestep and the virtual charge and discharge in the current timestep. Unlike the regular state of charge, virtual discharge $\Theta^{CRM}_{o,z,t}$ increases $\Gamma^{CRM}_{o,z,t}$ (as more charge must be held in reserve to support more virtual discharge), and $\Pi^{CRM}_{o,z,t}$ reduces $\Gamma^{CRM}_{o,z,t}$.
-```math
-\begin{aligned}
-	&  \Gamma^{CRM}_{o,z,t} =\Gamma^{CRM}_{o,z,t-1} + \frac{1}{\eta_{o,z}^{discharge}}\Theta^{CRM}_{o,z,t} - \eta_{o,z}^{charge}\Pi^{CRM}_{o,z,t} - \eta_{o,z}^{loss}\Gamma^{CRM}_{o,z,t-1}  \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}^{interior}\\
-	&  \Gamma^{CRM}_{o,z,t} =\Gamma^{CRM}_{o,z,t+\tau^{period}-1} + \frac{1}{\eta_{o,z}^{discharge}}\Theta^{CRM}_{o,z,t} - \eta_{o,z}^{charge}\Pi^{CRM}_{o,z,t} - \eta_{o,z}^{loss}\Gamma^{CRM}_{o,z,t+\tau^{period}-1}  \quad \forall o \in \mathcal{O}, z \in \mathcal{Z}, t \in \mathcal{T}^{start}
-\end{aligned}
-```
-The energy held in reserve, $\Gamma^{CRM}_{o,z,t}$, also acts as a lower bound on the overall state of charge $\Gamma_{o,z,t}$. This ensures that the storage device cannot use state of charge that would not have been available had it been called on to actually contribute its pledged virtual discharge at some earlier timestep. This relationship is described by the following equation:
-```math
-\begin{aligned}
-	&  \Gamma_{o,z,t} \geq \Gamma^{CRM}_{o,z,t} 
 \end{aligned}
 ```
 
@@ -114,12 +68,8 @@ When charging, reducing the charge rate is contributing to upwards reserve and f
 """
 function tes!(EP::Model, inputs::Dict, setup::Dict)
     println("TES Storage Resources Module")
-    gen = inputs["RESOURCES"]
-    T = inputs["T"]
-    Z = inputs["Z"]     # Number of zones
     TES = inputs["TES"]
 
-    p = inputs["hours_per_subperiod"]
     rep_periods = inputs["REP_PERIOD"]
 
     if !isempty(TES)
@@ -127,14 +77,13 @@ function tes!(EP::Model, inputs::Dict, setup::Dict)
         storage_all_tes!(EP, inputs, setup)
 
         # Include Long Duration Storage only when modeling representative periods and long-duration storage
-        if rep_periods > 1 && !isempty(inputs["STOR_LONG_DURATION_TES"])
+        if rep_periods > 1 && !isempty(inputs["LONG_DURATION_TES"])
             long_duration_storage_tes!(EP, inputs, setup)
         end
     end
 
     if !isempty(inputs["TES"])
         investment_charge_tes!(EP, inputs, setup)
-        storage_asymmetric_tes!(EP, inputs, setup)
     end
 
 end
