@@ -71,7 +71,8 @@ pages = OrderedDict(
                 "Investment Charge TES" => "Model_Reference/Resources/investment_charge_tes.md",
                 "Investment Energy TES" => "Model_Reference/Resources/investment_energy_tes.md",
                 "Long Duration Storage TES" => "Model_Reference/Resources/long_duration_storage_tes.md",
-                "Storage All TES" => "Model_Reference/Resources/storage_all_tes.md"
+                "Storage All TES" => "Model_Reference/Resources/storage_all_tes.md",
+                "Storage Asymmetric TES" => "Model_Reference/Resources/storage_asymmetric_tes.md"
             ]
             "Co-located VRE and Storage" => "Model_Reference/Resources/vre_stor.md",
             "Thermal" => [

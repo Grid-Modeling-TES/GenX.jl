@@ -1,6 +1,6 @@
 @doc raw"""
 	long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
-This function creates variables and constraints enabling modeling of long duration storage TES resources when modeling representative time periods.\
+This function creates variables and constraints enabling modeling of long duration storage resources when modeling representative time periods.\
 
 **Storage inventory balance at beginning of each representative period**
 The constraints in this section are used to approximate the behavior of long-duration energy storage technologies when approximating annual grid operations by modeling operations over representative periods. Previously, the state of charge balance for storage (as defined in ```storage_all_tes()```) assumed that state of charge at the beginning and end of each representative period has to be the same. In other words, the amount of energy built up or consumed by storage technology $o$ in zone $z$ over the representative period $m$, $\Delta Q_{o,z,m} = 0$. This assumption implicitly excludes the possibility of transferring energy from one representative period to the other which could be cost-optimal when the capital cost of energy storage capacity is relatively small. To model long-duration energy storage using representative periods, we replace the state of charge equation, such that the first term on the right hand side accounts for change in storage inventory associated with representative period $m$ ($\Delta Q_{o,z,m}$), which could be positive (net accumulation) or negative (net reduction).
@@ -64,7 +64,7 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
     REP_PERIOD = inputs["REP_PERIOD"]     # Number of representative periods
     hours_per_subperiod = inputs["hours_per_subperiod"] #total number of hours per subperiod
 
-    LONG_DURATION_TES = inputs["LONG_DURATION_TES"]
+    STOR_LONG_DURATION = inputs["STOR_LONG_DURATION_TES"]
 
     dfPeriodMap = inputs["Period_Map"] # Dataframe that maps modeled periods to representative periods
     NPeriods = size(inputs["Period_Map"])[1] # Number of modeled periods
@@ -77,11 +77,11 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
     # Variables to define inter-period energy transferred between modeled periods
 
     # State of charge of storage at beginning of each modeled period n
-    @variable(EP, vSOCw_TES[y in LONG_DURATION_TES, n in MODELED_PERIODS_INDEX]>=0)
+    @variable(EP, vSOCw_TES[y in STOR_LONG_DURATION, n in MODELED_PERIODS_INDEX]>=0)
 
     # Build up in storage inventory over each representative period w
     # Build up inventory can be positive or negative
-    @variable(EP, vdSOC_TES[y in LONG_DURATION_TES, w = 1:REP_PERIOD])
+    @variable(EP, vdSOC_TES[y in STOR_LONG_DURATION, w = 1:REP_PERIOD])
 
     ### Constraints ###
 
@@ -90,7 +90,7 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
     # Alternative to cSoCBalStart constraint which is included when not modeling operations wrapping and long duration storage
     # Note: tw_min = hours_per_subperiod*(w-1)+1; tw_max = hours_per_subperiod*w
     @constraint(EP,
-        cSoCBalLongDurationStorageStart_TES[w = 1:REP_PERIOD, y in LONG_DURATION_TES],
+        cSoCBalLongDurationStorageStart_TES[w = 1:REP_PERIOD, y in STOR_LONG_DURATION],
         EP[:vS_TES][y,
             hours_per_subperiod * (w - 1) + 1]==(1 - self_discharge(gen[y])) *
                                                 (EP[:vS_TES][y, hours_per_subperiod * w] -
@@ -104,21 +104,21 @@ function long_duration_storage_tes!(EP::Model, inputs::Dict, setup::Dict)
     # Storage at beginning of period w = storage at beginning of period w-1 + storage built up in period w (after n representative periods)
     ## Multiply storage build up term from prior period with corresponding weight
     @constraint(EP,
-        cSoCBalLongDurationStorage_TES[y in LONG_DURATION_TES, r in MODELED_PERIODS_INDEX],
+        cSoCBalLongDurationStorage_TES[y in STOR_LONG_DURATION, r in MODELED_PERIODS_INDEX],
         vSOCw_TES[y,
             mod1(r + 1, NPeriods)]==vSOCw_TES[y, r] +
                                     vdSOC_TES[y, dfPeriodMap[r, :Rep_Period_Index]])
 
     # Storage at beginning of each modeled period cannot exceed installed energy capacity
     @constraint(EP,
-        cSoCBalLongDurationStorageUpper_TES[y in LONG_DURATION_TES,
+        cSoCBalLongDurationStorageUpper_TES[y in STOR_LONG_DURATION,
             r in MODELED_PERIODS_INDEX],
         vSOCw_TES[y, r]<=EP[:eTotalCapEnergy_TES][y])
 
     # Initial storage level for representative periods must also adhere to sub-period storage inventory balance
     # Initial storage = Final storage - change in storage inventory across representative period
     @constraint(EP,
-        cSoCBalLongDurationStorageSub_TES[y in LONG_DURATION_TES, r in REP_PERIODS_INDEX],
+        cSoCBalLongDurationStorageSub_TES[y in STOR_LONG_DURATION, r in REP_PERIODS_INDEX],
         vSOCw_TES[y,
             r]==EP[:vS_TES][y, hours_per_subperiod * dfPeriodMap[r, :Rep_Period_Index]] -
                 vdSOC_TES[y, dfPeriodMap[r, :Rep_Period_Index]])

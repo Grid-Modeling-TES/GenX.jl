@@ -1,7 +1,7 @@
 @doc raw"""
 	investment_energy_tes!(EP::Model, inputs::Dict)
 
-This function defines the expressions and constraints keeping track of total available TES storage charge capacity across all resources as well as constraints on capacity retirements. The function also adds investment and fixed O\&M related costs related to charge capacity to the objective function.
+This function defines the expressions and constraints keeping track of total available storage charge capacity across all resources as well as constraints on capacity retirements. The function also adds investment and fixed O\&M related costs related to charge capacity to the objective function.
 
 The total capacity of each resource is defined as the sum of the existing capacity plus the newly invested capacity minus any retired capacity.
 
@@ -53,6 +53,8 @@ function investment_energy_tes!(EP::Model, inputs::Dict, setup::Dict)
     RET_CAP_ENERGY = inputs["RET_CAP_ENERGY_TES"] # Set of all storage resources eligible for energy capacity retirements
 
     ### Variables ###
+
+    ## Energy storage reservoir capacity (MWh capacity) built/retired for storage with variable power to energy ratio (STOR=1 or STOR=2)
 
     # New installed energy capacity of resource "y"
     @variable(EP, vCAPENERGY_TES[y in NEW_CAP_ENERGY]>=0)
