@@ -51,14 +51,14 @@ function storage_all_tes!(EP::Model, inputs::Dict, setup::Dict)
     # Subtract TES revenue from objective function
     scale_factor = setup["ParameterScale"] == 1 ? 10^6 : 1  # If ParameterScale==1, costs are in millions of $
     @expression(EP,
-        eHydrogenValue_TES[y in TES, t in 1:T],
+        eHeatValue_TES[y in TES, t in 1:T],
         (inputs["omega"][t] * EP[:vUSE_TES][y, t] / tes_mwh_per_mmbtu(gen[y]) *
         heat_price_per_mmbtu(gen[y])/scale_factor))
     @expression(EP,
-        eTotalHydrogenValueT_TES[t in 1:T],
-        sum(eHydrogenValue_TES[y, t] for y in TES))
-    @expression(EP, eTotalHydrogenValue_TES, sum(eTotalHydrogenValueT_TES[t] for t in 1:T))
-    EP[:eObj] -= eTotalHydrogenValue_TES
+        eTotalHeatValueT_TES[t in 1:T],
+        sum(eHeatValue_TES[y, t] for y in TES))
+    @expression(EP, eTotalHeatValue_TES, sum(eTotalHeatValueT_TES[t] for t in 1:T))
+    EP[:eObj] -= eTotalHeatValue_TES
     
 
     ## Power Balance Expressions ##

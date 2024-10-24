@@ -87,26 +87,26 @@ function investment_energy_tes!(EP::Model, inputs::Dict, setup::Dict)
 
     # Fixed costs for resource "y" = annuitized investment cost plus fixed O&M costs
     # If resource is not eligible for new energy capacity, fixed costs are only O&M costs
-    @expression(EP, eCFixEnergy_TES[y in TES],
-        if y in NEW_CAP_ENERGY # Resources eligible for new capacity
-            inv_cost_per_mwhyr(gen[y]) * vCAPENERGY_TES[y] +
-            fixed_om_cost_per_mwhyr(gen[y]) * eTotalCapEnergy_TES[y]
-        else
-            fixed_om_cost_per_mwhyr(gen[y]) * eTotalCapEnergy_TES[y]
-        end)
+    #@expression(EP, eCFixEnergy_TES[y in TES],
+    #    if y in NEW_CAP_ENERGY # Resources eligible for new capacity
+    #        inv_cost_per_mwhyr(gen[y]) * vCAPENERGY_TES[y] +
+    #        fixed_om_cost_per_mwhyr(gen[y]) * eTotalCapEnergy_TES[y]
+    #    else
+    #        fixed_om_cost_per_mwhyr(gen[y]) * eTotalCapEnergy_TES[y]
+    #    end)
 
     # Sum individual resource contributions to fixed costs to get total fixed costs
-    @expression(EP, eTotalCFixEnergy_TES, sum(EP[:eCFixEnergy_TES][y] for y in TES))
+    #@expression(EP, eTotalCFixEnergy_TES, sum(EP[:eCFixEnergy_TES][y] for y in TES))
 
     # Add term to objective function expression
-    if MultiStage == 1
+    #if MultiStage == 1
         # OPEX multiplier scales fixed costs to account for multiple years between two model stages
         # We divide by OPEXMULT since we are going to multiply the entire objective function by this term later,
         # and we have already accounted for multiple years between stages for fixed costs.
-        add_to_expression!(EP[:eObj], (1 / inputs["OPEXMULT"]), eTotalCFixEnergy_TES)
-    else
-        add_to_expression!(EP[:eObj], eTotalCFixEnergy_TES)
-    end
+    #    add_to_expression!(EP[:eObj], (1 / inputs["OPEXMULT"]), eTotalCFixEnergy_TES)
+    #else
+    #    add_to_expression!(EP[:eObj], eTotalCFixEnergy_TES)
+    #end
 
     ### Constraints ###
 

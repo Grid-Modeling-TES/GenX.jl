@@ -99,7 +99,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
     end
     if !isempty(TES)
         push!(total_cost,
-            (!isempty(inputs["TES"]) ? -1 * value(EP[:eTotalHydrogenValue_TES]) : 0.0))
+            (!isempty(inputs["TES"]) ? -1 * value(EP[:eTotalHeatValue_TES]) : 0.0))
     end
 
     dfCost[!, Symbol("Total")] = total_cost
@@ -188,7 +188,8 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
             tempCVar += eCVar_in
             if !isempty(TES_ZONE)
                 eCVar_in = sum(value.(EP[:eCVar_in][STOR_ALL_ZONE, :])) + sum(value.(EP[:eCVar_in_TES][TES_ZONE, :]))
-                eCFixEnergy = sum(value.(EP[:eCFixEnergy][STOR_ALL_ZONE])) + sum(value.(EP[:eCFixEnergy_TES][TES_ZONE]))
+                eCFixEnergy = sum(value.(EP[:eCFixEnergy][STOR_ALL_ZONE])) 
+                # + sum(value.(EP[:eCFixEnergy_TES][TES_ZONE]))
             else
                 eCVar_in = sum(value.(EP[:eCVar_in][STOR_ALL_ZONE, :]))
                 eCFixEnergy = sum(value.(EP[:eCFixEnergy][STOR_ALL_ZONE]))
@@ -207,7 +208,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
             tempCTotal += eCFixCharge
         end
         if !isempty(TES_ZONE)
-            tempTESValue = -1 * sum(value.(EP[:eHydrogenValue_TES][TES_ZONE, :]))
+            tempTESValue = -1 * sum(value.(EP[:eHeatValue_TES][TES_ZONE, :]))
             tempCTotal += tempTESValue
         end
         if !isempty(FLEX_ZONE)
